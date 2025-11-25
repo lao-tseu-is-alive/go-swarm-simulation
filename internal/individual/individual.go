@@ -1,56 +1,69 @@
 package individual
 
 import (
+	"math"
 	"math/rand"
 
 	"github.com/tochemey/goakt/v3/actor"
 	"github.com/tochemey/goakt/v3/goaktpb"
 )
 
-// Individual represents a single entity in our world.
+// Enum Constants for Color
+const (
+	ColorRed  = "🔴 RED"
+	ColorBlue = "🔵 BLUE"
+)
+
 type Individual struct {
-	ID    string
-	Color string // "RED" or "BLUE"
-	X, Y  float64
-
-	// Internal velocity
-	vx, vy float64
-
-	// Communication channel to the UI
-	reportCh chan<- *ActorState
+	ID             string
+	Color          string
+	X, Y           float64
+	vx, vy         float64
+	reportCh       chan<- *ActorState
+	visibleTargets []*ActorState
 }
 
-// Enforce interface compliance
 var _ actor.Actor = (*Individual)(nil)
 
-// NewIndividual creates the struct state (not the actor itself)
 func NewIndividual(color string, startX, startY float64, reportCh chan<- *ActorState) *Individual {
 	return &Individual{
-		Color:    color,
-		X:        startX,
-		Y:        startY,
+		Color: color,
+		X:     startX,
+		Y:     startY,
+		// Initialize with random velocity
 		vx:       (rand.Float64() - 0.5) * 2,
 		vy:       (rand.Float64() - 0.5) * 2,
 		reportCh: reportCh,
 	}
 }
 
-// PreStart initializes the actor.
 func (i *Individual) PreStart(ctx *actor.Context) error {
-	// We can use this to setup resources, but for now, we just log.
 	ctx.ActorSystem().Logger().Infof("Born: %s (%s) at %.2f, %.2f", ctx.ActorName(), i.Color, i.X, i.Y)
 	return nil
 }
 
-// Receive is the brain. It handles messages one by one.
 func (i *Individual) Receive(ctx *actor.ReceiveContext) {
-	switch ctx.Message().(type) {
+	switch msg := ctx.Message().(type) {
 	case *goaktpb.PostStart:
 		ctx.Logger().Infof("%s started", ctx.Self().Name())
 
+	case *Perception:
+		i.visibleTargets = msg.Targets
+
+	// NEW: Handle Conversion
+	case *Convert:
+		if i.Color != msg.TargetColor {
+			ctx.Logger().Infof("%s converting from %s to %s", ctx.Self().Name(), i.Color, msg.TargetColor)
+			i.Color = msg.TargetColor
+			i.visibleTargets = nil // Clear memory of old enemies
+
+			// Reaction jump: Push them slightly away to visualize the impact
+			i.vx *= -1.5
+			i.vy *= -1.5
+		}
+
 	case *Tick:
 		i.updatePosition()
-		// PUSH: Send our new state to the UI immediately
 		i.reportCh <- &ActorState{
 			Id:        ctx.Self().Name(),
 			Color:     i.Color,
@@ -59,7 +72,6 @@ func (i *Individual) Receive(ctx *actor.ReceiveContext) {
 		}
 
 	case *GetState:
-		// Keep this for debugging if needed
 		response := &ActorState{
 			Id:        ctx.Self().Name(),
 			Color:     i.Color,
@@ -67,39 +79,40 @@ func (i *Individual) Receive(ctx *actor.ReceiveContext) {
 			PositionY: i.Y,
 		}
 		ctx.Response(response)
+
 	default:
-		// Always handle unknown messages gracefully
 		ctx.Unhandled()
 	}
 }
 
-// PostStop cleans up.
 func (i *Individual) PostStop(ctx *actor.Context) error {
-	ctx.ActorSystem().Logger().Infof("Died: %s", ctx.ActorName())
 	return nil
 }
 
-// updatePosition implements the specific "personality" logic
 func (i *Individual) updatePosition() {
-	speedFactor := 1.0
-
-	if i.Color == "🔴 RED" {
-		i.vx += (rand.Float64() - 0.5) * 0.5
-		i.vy += (rand.Float64() - 0.5) * 0.5
-		speedFactor = 2.0
+	// 1. Behavior Logic
+	if i.Color == ColorRed {
+		// Aggressive Chase behavior
+		if len(i.visibleTargets) > 0 {
+			i.chaseClosestTarget()
+		} else {
+			// Random jitter if no target
+			i.vx += (rand.Float64() - 0.5) * 0.2
+			i.vy += (rand.Float64() - 0.5) * 0.2
+		}
 	} else {
-		// no randomness in blue individuals just a slower clear predictable path...
+		// Blue: Consensual/Swarm behavior (Cohesion could be added here)
+		// For now, they stabilize and drift
 		i.vx += 0.05
 		i.vy += 0.05
-		speedFactor = 1.5
 	}
 
-	i.X += i.vx * speedFactor
-	i.Y += i.vy * speedFactor
+	// 2. Physics Integration
+	i.X += i.vx
+	i.Y += i.vy
 
-	// Screen bounds (matches Ebiten window size)
+	// 3. World Bounds
 	screenWidth, screenHeight := 640.0, 480.0
-
 	if i.X < 0 {
 		i.X = 0
 		i.vx *= -1
@@ -115,5 +128,43 @@ func (i *Individual) updatePosition() {
 	if i.Y > screenHeight {
 		i.Y = screenHeight
 		i.vy *= -1
+	}
+}
+
+func (i *Individual) chaseClosestTarget() {
+	var closest *ActorState
+	minDistSq := math.MaxFloat64
+
+	for _, target := range i.visibleTargets {
+		dx := target.PositionX - i.X
+		dy := target.PositionY - i.Y
+		distSq := dx*dx + dy*dy
+
+		if distSq < minDistSq {
+			minDistSq = distSq
+			closest = target
+		}
+	}
+
+	if closest != nil {
+		dx := closest.PositionX - i.X
+		dy := closest.PositionY - i.Y
+		length := math.Sqrt(dx*dx + dy*dy)
+		if length > 0 {
+			dx /= length
+			dy /= length
+		}
+
+		agression := 0.8 // Increased aggression for better catching
+		i.vx += dx * agression
+		i.vy += dy * agression
+
+		// Cap max speed
+		maxSpeed := 5.0
+		speed := math.Sqrt(i.vx*i.vx + i.vy*i.vy)
+		if speed > maxSpeed {
+			i.vx = (i.vx / speed) * maxSpeed
+			i.vy = (i.vy / speed) * maxSpeed
+		}
 	}
 }

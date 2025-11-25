@@ -172,6 +172,96 @@ func (x *ActorState) GetPositionY() float64 {
 	return 0
 }
 
+// Perception is sent by the world to tell an actor what neighbors are visible
+type Perception struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Targets       []*ActorState          `protobuf:"bytes,1,rep,name=targets,proto3" json:"targets,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Perception) Reset() {
+	*x = Perception{}
+	mi := &file_pb_simulation_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Perception) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Perception) ProtoMessage() {}
+
+func (x *Perception) ProtoReflect() protoreflect.Message {
+	mi := &file_pb_simulation_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Perception.ProtoReflect.Descriptor instead.
+func (*Perception) Descriptor() ([]byte, []int) {
+	return file_pb_simulation_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *Perception) GetTargets() []*ActorState {
+	if x != nil {
+		return x.Targets
+	}
+	return nil
+}
+
+// Convert message is the command to switch teams
+type Convert struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	TargetColor   string                 `protobuf:"bytes,1,opt,name=target_color,json=targetColor,proto3" json:"target_color,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Convert) Reset() {
+	*x = Convert{}
+	mi := &file_pb_simulation_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Convert) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Convert) ProtoMessage() {}
+
+func (x *Convert) ProtoReflect() protoreflect.Message {
+	mi := &file_pb_simulation_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Convert.ProtoReflect.Descriptor instead.
+func (*Convert) Descriptor() ([]byte, []int) {
+	return file_pb_simulation_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *Convert) GetTargetColor() string {
+	if x != nil {
+		return x.TargetColor
+	}
+	return ""
+}
+
 var File_pb_simulation_proto protoreflect.FileDescriptor
 
 const file_pb_simulation_proto_rawDesc = "" +
@@ -189,7 +279,12 @@ const file_pb_simulation_proto_rawDesc = "" +
 	"\n" +
 	"position_x\x18\x03 \x01(\x01R\tpositionX\x12\x1d\n" +
 	"\n" +
-	"position_y\x18\x04 \x01(\x01R\tpositionYB5Z3github.com/lao-tseu-is-alive/go-swarm-simulation/pbb\x06proto3"
+	"position_y\x18\x04 \x01(\x01R\tpositionY\"6\n" +
+	"\n" +
+	"Perception\x12(\n" +
+	"\atargets\x18\x01 \x03(\v2\x0e.pb.ActorStateR\atargets\",\n" +
+	"\aConvert\x12!\n" +
+	"\ftarget_color\x18\x01 \x01(\tR\vtargetColorB5Z3github.com/lao-tseu-is-alive/go-swarm-simulation/pbb\x06proto3"
 
 var (
 	file_pb_simulation_proto_rawDescOnce sync.Once
@@ -203,18 +298,21 @@ func file_pb_simulation_proto_rawDescGZIP() []byte {
 	return file_pb_simulation_proto_rawDescData
 }
 
-var file_pb_simulation_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
+var file_pb_simulation_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
 var file_pb_simulation_proto_goTypes = []any{
 	(*Tick)(nil),       // 0: pb.Tick
 	(*GetState)(nil),   // 1: pb.GetState
 	(*ActorState)(nil), // 2: pb.ActorState
+	(*Perception)(nil), // 3: pb.Perception
+	(*Convert)(nil),    // 4: pb.Convert
 }
 var file_pb_simulation_proto_depIdxs = []int32{
-	0, // [0:0] is the sub-list for method output_type
-	0, // [0:0] is the sub-list for method input_type
-	0, // [0:0] is the sub-list for extension type_name
-	0, // [0:0] is the sub-list for extension extendee
-	0, // [0:0] is the sub-list for field type_name
+	2, // 0: pb.Perception.targets:type_name -> pb.ActorState
+	1, // [1:1] is the sub-list for method output_type
+	1, // [1:1] is the sub-list for method input_type
+	1, // [1:1] is the sub-list for extension type_name
+	1, // [1:1] is the sub-list for extension extendee
+	0, // [0:1] is the sub-list for field type_name
 }
 
 func init() { file_pb_simulation_proto_init() }
@@ -228,7 +326,7 @@ func file_pb_simulation_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_pb_simulation_proto_rawDesc), len(file_pb_simulation_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   3,
+			NumMessages:   5,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

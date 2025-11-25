@@ -2,67 +2,113 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"image/color"
 	"log"
-	"time"
+	"math/rand"
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/vector"
 	"github.com/tochemey/goakt/v3/actor"
 
-	// Use your specific import path here
 	"github.com/lao-tseu-is-alive/go-swarm-simulation/internal/individual"
 	golog "github.com/tochemey/goakt/v3/log"
 )
 
-func displayPosition(ctx context.Context, actorPID *actor.PID) error {
-	res, err := actor.Ask(ctx, actorPID, &individual.GetState{}, 1*time.Second)
-	if err != nil {
-		fmt.Printf("Error asking actor %v: %v\n", actorPID, err)
-		return err
-	}
-	// Cast the response to the expected type
-	if state, ok := res.(*individual.ActorState); ok {
-		fmt.Printf("%8s %12s is at [%.0f, %.0f]\n", state.Color, state.Id, state.PositionX, state.PositionY)
-	}
-	return nil
-}
-
-// Game implements ebiten.Game interface
 type Game struct {
 	actorSystem actor.ActorSystem
 	ctx         context.Context
-
-	// PIDs of our swarm
-	pids []*actor.PID
-
-	// Bridge: Channel to receive updates from actors
-	updates chan *individual.ActorState
-
-	// View: The current state of the world for rendering
-	// Map ID -> State
-	worldState map[string]*individual.ActorState
+	pids        []*actor.PID
+	updates     chan *individual.ActorState
+	worldState  map[string]*individual.ActorState
 }
 
 func (g *Game) Update() error {
-	// 1. Drain the channel: Process all updates sent by actors since the last frame
+	// 1. Drain Channel
 Loop:
 	for {
 		select {
 		case state := <-g.updates:
-			// Update our local view of the world
 			g.worldState[state.Id] = state
 		default:
-			// Channel is empty, stop reading
 			break Loop
 		}
 	}
 
-	// 2. Send Tick to all actors to make them move
-	// Note: Ebiten calls Update() 60 times per second by default.
+	// 2. GAME LOGIC: Perception, Collision, and Conversion
+	detectionDistSq := 100.0 * 100.0 // Large detection range for chasing (200 units)
+	contactDistSq := 12.0 * 12.0     // Collision distance (radius 5 + 5 + margin)
+	defenseDistSq := 35.0 * 35.0     // Defense radius (User requested 10, typically too small for 3 units, bumped to 25 for playability)
+
+	// Note: We iterate only through RED actors to drive the interactions
+	// This is an O(N*M) operation. Fine for < 500 actors.
+	for _, redPID := range g.pids {
+		redState, ok := g.worldState[redPID.Name()]
+		if !ok || redState.Color != individual.ColorRed {
+			continue
+		}
+
+		var visiblePrey []*individual.ActorState
+
+		// Scan for Blue targets
+		for _, entity := range g.worldState {
+			if entity.Color == individual.ColorBlue {
+				dx := entity.PositionX - redState.PositionX
+				dy := entity.PositionY - redState.PositionY
+				distSq := dx*dx + dy*dy
+
+				// Perception: Can I see it?
+				if distSq < detectionDistSq {
+					visiblePrey = append(visiblePrey, entity)
+				}
+
+				// Interaction: Did I catch it?
+				if distSq < contactDistSq {
+					// === COMBAT LOGIC ===
+
+					// Check Defense: How many Blue friends are near the Victim?
+					blueDefenders := 0
+					for _, defender := range g.worldState {
+						if defender.Color == individual.ColorBlue && defender.Id != entity.Id {
+							defDx := defender.PositionX - entity.PositionX
+							defDy := defender.PositionY - entity.PositionY
+							if (defDx*defDx + defDy*defDy) < defenseDistSq {
+								blueDefenders++
+							}
+						}
+					}
+
+					if blueDefenders >= 3 {
+						// DEFENSE SUCCESS: Red converts to Blue!
+						// Send command to the RED actor (Attacker)
+						g.actorSystem.NoSender().Tell(g.ctx, redPID, &individual.Convert{
+							TargetColor: individual.ColorBlue,
+						})
+					} else {
+						// DEFENSE FAILED: Blue converts to Red!
+						// Send command to the BLUE actor (Victim)
+						// We need the PID for the blue actor. Ideally, we map IDs to PIDs efficiently.
+						// For this demo, linear search or finding via name is okay.
+						targetPID, _ := g.actorSystem.LocalActor(entity.Id)
+						if targetPID != nil {
+							g.actorSystem.NoSender().Tell(g.ctx, targetPID, &individual.Convert{
+								TargetColor: individual.ColorRed,
+							})
+						}
+					}
+				}
+			}
+		}
+
+		// Send perception update to Red actor so it knows where to run
+		if len(visiblePrey) > 0 {
+			g.actorSystem.NoSender().Tell(g.ctx, redPID, &individual.Perception{
+				Targets: visiblePrey,
+			})
+		}
+	}
+
+	// 3. Send Tick
 	for _, pid := range g.pids {
-		// We use Tell (Fire-and-Forget) for maximum performance
 		g.actorSystem.NoSender().Tell(g.ctx, pid, &individual.Tick{})
 	}
 
@@ -70,83 +116,66 @@ Loop:
 }
 
 func (g *Game) Draw(screen *ebiten.Image) {
-	// Iterate over our world state and draw every individual
 	for _, entity := range g.worldState {
-
-		// Choose color
 		var clr color.Color
-		if entity.Color == "🔴 RED" {
-			clr = color.RGBA{R: 255, G: 50, B: 50, A: 255}
+		// Use the Enum string to determine visual color
+		if entity.Color == individual.ColorRed {
+			clr = color.RGBA{255, 50, 50, 255}
 		} else {
-			clr = color.RGBA{R: 50, G: 50, B: 255, A: 255}
+			clr = color.RGBA{50, 100, 255, 255}
 		}
 
-		// Draw a circle
 		vector.FillCircle(
 			screen,
 			float32(entity.PositionX),
 			float32(entity.PositionY),
-			5, // Radius
+			6,
 			clr,
-			true, // Antialiasing
+			true,
 		)
 	}
 }
 
-func (g *Game) Layout(outsideWidth, outsideHeight int) (int, int) {
-	return 640, 480
-}
+func (g *Game) Layout(w, h int) (int, int) { return 640, 480 }
 
 func main() {
 	ctx := context.Background()
-
-	// 1. Init Actor System
-	system, err := actor.NewActorSystem("SwarmWorld",
-		actor.WithLogger(golog.DiscardLogger), // Reduce log noise in console
+	system, _ := actor.NewActorSystem("SwarmWorld",
+		actor.WithLogger(golog.DiscardLogger),
 		actor.WithActorInitMaxRetries(3))
-	if err != nil {
-		panic(err)
-	}
-	if err := system.Start(ctx); err != nil {
-		panic(err)
-	}
+	_ = system.Start(ctx)
 	defer system.Stop(ctx)
 
-	// 2. Create the channel bridge
-	// Buffer it slightly to handle bursts
 	updateChannel := make(chan *individual.ActorState, 1000)
-
-	// 3. Spawn Swarm
 	var pids []*actor.PID
 
-	// Spawn 10 Red Aggressive ones
-	for i := 0; i < 10; i++ {
+	// Spawn a swarm!
+	// 5 Red (Attacking)
+	for i := 0; i < 5; i++ {
 		pid, _ := system.Spawn(ctx, "Red-"+string(rune(i+'0')),
-			individual.NewIndividual("🔴 RED", 100, 100, updateChannel))
+			individual.NewIndividual(individual.ColorRed, 50+float64(i)*20, 100, updateChannel))
 		pids = append(pids, pid)
 	}
 
-	// Spawn 10 Blue Calm ones
-	for i := 0; i < 10; i++ {
-		pid, _ := system.Spawn(ctx, "Blue-"+string(rune(i+'0')),
-			individual.NewIndividual("🔵 BLUE", 400, 300, updateChannel))
+	// 30 Blue (Defending) - More blues to allow clustering
+	for i := 0; i < 30; i++ {
+		// Determine generic name based on index
+		name := "Blue-" + string(rune(i%10+'0')) + "-" + string(rune(i/10+'0'))
+		pid, _ := system.Spawn(ctx, name,
+			individual.NewIndividual(individual.ColorBlue, 300+float64(rand.Intn(100)), 100+float64(rand.Intn(100)), updateChannel))
 		pids = append(pids, pid)
 	}
 
-	// 4. Start Game Loop
-	game := &Game{
+	ebiten.SetWindowSize(640, 480)
+	ebiten.SetWindowTitle("Swarm: Red vs Blue (Defense Mode)")
+
+	if err := ebiten.RunGame(&Game{
 		actorSystem: system,
 		ctx:         ctx,
 		pids:        pids,
 		updates:     updateChannel,
 		worldState:  make(map[string]*individual.ActorState),
-	}
-
-	ebiten.SetWindowSize(640, 480)
-	ebiten.SetWindowTitle("GoAkt Swarm Simulation")
-
-	// Block until window is closed
-	if err := ebiten.RunGame(game); err != nil {
+	}); err != nil {
 		log.Fatal(err)
 	}
 }
