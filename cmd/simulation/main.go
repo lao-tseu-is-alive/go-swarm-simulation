@@ -48,9 +48,15 @@ func main() {
 
 			// Ask where they are
 			// Note: Ask is synchronous for this demo, in real game loop we handle this differently
-			res, _ := actor.Ask(ctx, redPID, &individual.GetState{}, 1*time.Second)
-			state := res.(*individual.ActorState)
-			fmt.Printf("🔴 RED is at [%.0f, %.0f]\n", state.PositionX, state.PositionY)
+			res, err := actor.Ask(ctx, redPID, &individual.GetState{}, 1*time.Second)
+			if err != nil {
+				fmt.Printf("Error asking actor: %v\n", err)
+				continue
+			}
+			// Cast the response to the expected type
+			if state, ok := res.(*individual.ActorState); ok {
+				fmt.Printf("🔴 RED %s is at [%.0f, %.0f]\n", state.Id, state.PositionX, state.PositionY)
+			}
 		}
 	}()
 

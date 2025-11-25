@@ -34,13 +34,13 @@ func NewIndividual(color string, startX, startY float64) *Individual {
 // PreStart initializes the actor.
 func (i *Individual) PreStart(ctx *actor.Context) error {
 	// We can use this to setup resources, but for now, we just log.
-	ctx.Logger().Infof("Born: %s (%s) at %.2f, %.2f", ctx.ActorName(), i.Color, i.X, i.Y)
+	ctx.ActorSystem().Logger().Infof("Born: %s (%s) at %.2f, %.2f", ctx.ActorName(), i.Color, i.X, i.Y)
 	return nil
 }
 
 // Receive is the brain. It handles messages one by one.
 func (i *Individual) Receive(ctx *actor.ReceiveContext) {
-	switch msg := ctx.Message().(type) {
+	switch ctx.Message().(type) {
 
 	case *goaktpb.PostStart:
 		// Lifecycle event when actor fully starts
@@ -52,13 +52,13 @@ func (i *Individual) Receive(ctx *actor.ReceiveContext) {
 		// Respond to the sender with our current state
 		// Note: We use ctx.Sender() to reply.
 		response := &ActorState{
-			Id:        ctx.ActorName(),
+			Id:        ctx.Self().Name(),
 			Color:     i.Color,
 			PositionX: i.X,
 			PositionY: i.Y,
 		}
 		// Send reply safely
-		if ctx.Sender() != actor.NoSender {
+		if ctx.Sender() != nil {
 			ctx.Response(response)
 		}
 
@@ -70,7 +70,7 @@ func (i *Individual) Receive(ctx *actor.ReceiveContext) {
 
 // PostStop cleans up.
 func (i *Individual) PostStop(ctx *actor.Context) error {
-	ctx.Logger().Infof("Died: %s", ctx.ActorName())
+	ctx.ActorSystem().Logger().Infof("Died: %s", ctx.ActorName())
 	return nil
 }
 
