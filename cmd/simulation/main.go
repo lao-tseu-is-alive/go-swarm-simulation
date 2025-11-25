@@ -14,6 +14,19 @@ import (
 	"github.com/lao-tseu-is-alive/go-swarm-simulation/internal/individual" // Import your generated protobuf // Import your actor package
 )
 
+func displayPosition(ctx context.Context, actorPID *actor.PID) error {
+	res, err := actor.Ask(ctx, actorPID, &individual.GetState{}, 1*time.Second)
+	if err != nil {
+		fmt.Printf("Error asking actor %v: %v\n", actorPID, err)
+		return err
+	}
+	// Cast the response to the expected type
+	if state, ok := res.(*individual.ActorState); ok {
+		fmt.Printf("%8s %12s is at [%.0f, %.0f]\n", state.Color, state.Id, state.PositionX, state.PositionY)
+	}
+	return nil
+}
+
 func main() {
 	ctx := context.Background()
 
@@ -31,32 +44,38 @@ func main() {
 
 	// 2. Spawn Individuals
 	// Red One
-	redPID, _ := system.Spawn(ctx, "Aggressive-1",
-		individual.NewIndividual("RED", 100, 100))
+	redPID, err := system.Spawn(ctx, "Aggressive-1",
+		individual.NewIndividual("🔴 RED", 100, 100))
+	if err != nil {
+		fmt.Printf("Error creating red individual: %v\n", err)
+	}
 
 	// Blue One
-	bluePID, _ := system.Spawn(ctx, "Calm-1",
-		individual.NewIndividual("BLUE", 400, 300))
+	bluePID, err := system.Spawn(ctx, "Calm-1",
+		individual.NewIndividual("🔵 BLUE", 400, 300))
+	if err != nil {
+		fmt.Printf("Error creating blue individual: %v\n", err)
+	}
 
 	// 3. Simulation Loop (The Game Loop)
 	ticker := time.NewTicker(500 * time.Millisecond)
 	go func() {
 		for range ticker.C {
 			// Tell them to move
-			system.NoSender().SendAsync(ctx, redPID.ID(), &individual.Tick{})
-			system.NoSender().SendAsync(ctx, bluePID.ID(), &individual.Tick{})
+			system.NoSender().Tell(ctx, redPID, &individual.Tick{})
+			system.NoSender().Tell(ctx, bluePID, &individual.Tick{})
 
 			// Ask where they are
 			// Note: Ask is synchronous for this demo, in real game loop we handle this differently
-			res, err := actor.Ask(ctx, redPID, &individual.GetState{}, 1*time.Second)
+			err := displayPosition(ctx, redPID)
 			if err != nil {
-				fmt.Printf("Error asking actor: %v\n", err)
 				continue
 			}
-			// Cast the response to the expected type
-			if state, ok := res.(*individual.ActorState); ok {
-				fmt.Printf("🔴 RED %s is at [%.0f, %.0f]\n", state.Id, state.PositionX, state.PositionY)
+			err = displayPosition(ctx, bluePID)
+			if err != nil {
+				continue
 			}
+
 		}
 	}()
 
