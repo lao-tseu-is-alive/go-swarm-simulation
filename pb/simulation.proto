@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+package pb;
+
+option go_package = "github.com/lao-tseu-is-alive/go-swarm-simulation/pb";
+
+// Sent by the World to tell actors to update their state
+message Tick {
+  int64 delta_time = 1; // Time elapsed since last frame
+}
+
+// Sent by the World to ask for current status
+message GetState {}
+
+// The response containing the actor's data
+message ActorState {
+  string id = 1;
+  string color = 2; // "RED" or "BLUE"
+  double position_x = 3;
+  double position_y = 4;
+}
