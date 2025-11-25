@@ -3,15 +3,17 @@ package main
 import (
 	"context"
 	"fmt"
-	"os"
-	"os/signal"
-	"syscall"
+	"image/color"
+	"log"
 	"time"
 
+	"github.com/hajimehoshi/ebiten/v2"
+	"github.com/hajimehoshi/ebiten/v2/vector"
 	"github.com/tochemey/goakt/v3/actor"
-	"github.com/tochemey/goakt/v3/log"
 
-	"github.com/lao-tseu-is-alive/go-swarm-simulation/internal/individual" // Import your generated protobuf // Import your actor package
+	// Use your specific import path here
+	"github.com/lao-tseu-is-alive/go-swarm-simulation/internal/individual"
+	golog "github.com/tochemey/goakt/v3/log"
 )
 
 func displayPosition(ctx context.Context, actorPID *actor.PID) error {
@@ -27,62 +29,124 @@ func displayPosition(ctx context.Context, actorPID *actor.PID) error {
 	return nil
 }
 
+// Game implements ebiten.Game interface
+type Game struct {
+	actorSystem actor.ActorSystem
+	ctx         context.Context
+
+	// PIDs of our swarm
+	pids []*actor.PID
+
+	// Bridge: Channel to receive updates from actors
+	updates chan *individual.ActorState
+
+	// View: The current state of the world for rendering
+	// Map ID -> State
+	worldState map[string]*individual.ActorState
+}
+
+func (g *Game) Update() error {
+	// 1. Drain the channel: Process all updates sent by actors since the last frame
+Loop:
+	for {
+		select {
+		case state := <-g.updates:
+			// Update our local view of the world
+			g.worldState[state.Id] = state
+		default:
+			// Channel is empty, stop reading
+			break Loop
+		}
+	}
+
+	// 2. Send Tick to all actors to make them move
+	// Note: Ebiten calls Update() 60 times per second by default.
+	for _, pid := range g.pids {
+		// We use Tell (Fire-and-Forget) for maximum performance
+		g.actorSystem.NoSender().Tell(g.ctx, pid, &individual.Tick{})
+	}
+
+	return nil
+}
+
+func (g *Game) Draw(screen *ebiten.Image) {
+	// Iterate over our world state and draw every individual
+	for _, entity := range g.worldState {
+
+		// Choose color
+		var clr color.Color
+		if entity.Color == "🔴 RED" {
+			clr = color.RGBA{R: 255, G: 50, B: 50, A: 255}
+		} else {
+			clr = color.RGBA{R: 50, G: 50, B: 255, A: 255}
+		}
+
+		// Draw a circle
+		vector.FillCircle(
+			screen,
+			float32(entity.PositionX),
+			float32(entity.PositionY),
+			5, // Radius
+			clr,
+			true, // Antialiasing
+		)
+	}
+}
+
+func (g *Game) Layout(outsideWidth, outsideHeight int) (int, int) {
+	return 640, 480
+}
+
 func main() {
 	ctx := context.Background()
 
-	// 1. Initialize Actor System
+	// 1. Init Actor System
 	system, err := actor.NewActorSystem("SwarmWorld",
-		actor.WithLogger(log.DefaultLogger),
+		actor.WithLogger(golog.DiscardLogger), // Reduce log noise in console
 		actor.WithActorInitMaxRetries(3))
 	if err != nil {
 		panic(err)
 	}
-
 	if err := system.Start(ctx); err != nil {
 		panic(err)
 	}
+	defer system.Stop(ctx)
 
-	// 2. Spawn Individuals
-	// Red One
-	redPID, err := system.Spawn(ctx, "Aggressive-1",
-		individual.NewIndividual("🔴 RED", 100, 100))
-	if err != nil {
-		fmt.Printf("Error creating red individual: %v\n", err)
+	// 2. Create the channel bridge
+	// Buffer it slightly to handle bursts
+	updateChannel := make(chan *individual.ActorState, 1000)
+
+	// 3. Spawn Swarm
+	var pids []*actor.PID
+
+	// Spawn 10 Red Aggressive ones
+	for i := 0; i < 10; i++ {
+		pid, _ := system.Spawn(ctx, "Red-"+string(rune(i+'0')),
+			individual.NewIndividual("🔴 RED", 100, 100, updateChannel))
+		pids = append(pids, pid)
 	}
 
-	// Blue One
-	bluePID, err := system.Spawn(ctx, "Calm-1",
-		individual.NewIndividual("🔵 BLUE", 400, 300))
-	if err != nil {
-		fmt.Printf("Error creating blue individual: %v\n", err)
+	// Spawn 10 Blue Calm ones
+	for i := 0; i < 10; i++ {
+		pid, _ := system.Spawn(ctx, "Blue-"+string(rune(i+'0')),
+			individual.NewIndividual("🔵 BLUE", 400, 300, updateChannel))
+		pids = append(pids, pid)
 	}
 
-	// 3. Simulation Loop (The Game Loop)
-	ticker := time.NewTicker(500 * time.Millisecond)
-	go func() {
-		for range ticker.C {
-			// Tell them to move
-			system.NoSender().Tell(ctx, redPID, &individual.Tick{})
-			system.NoSender().Tell(ctx, bluePID, &individual.Tick{})
+	// 4. Start Game Loop
+	game := &Game{
+		actorSystem: system,
+		ctx:         ctx,
+		pids:        pids,
+		updates:     updateChannel,
+		worldState:  make(map[string]*individual.ActorState),
+	}
 
-			// Ask where they are
-			// Note: Ask is synchronous for this demo, in real game loop we handle this differently
-			err := displayPosition(ctx, redPID)
-			if err != nil {
-				continue
-			}
-			err = displayPosition(ctx, bluePID)
-			if err != nil {
-				continue
-			}
+	ebiten.SetWindowSize(640, 480)
+	ebiten.SetWindowTitle("GoAkt Swarm Simulation")
 
-		}
-	}()
-
-	// 4. Wait for Ctrl+C
-	interrupt := make(chan os.Signal, 1)
-	signal.Notify(interrupt, os.Interrupt, syscall.SIGTERM)
-	<-interrupt
-
-	system.Stop(ctx)
+	// Block until window is closed
+	if err := ebiten.RunGame(game); err != nil {
+		log.Fatal(err)
+	}
 }

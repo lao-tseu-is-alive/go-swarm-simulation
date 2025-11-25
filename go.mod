@@ -3,6 +3,7 @@ module github.com/lao-tseu-is-alive/go-swarm-simulation
 go 1.25.4
 
 require (
+	github.com/hajimehoshi/ebiten/v2 v2.9.4
 	github.com/tochemey/goakt/v3 v3.9.9
 	google.golang.org/protobuf v1.36.10
 )
@@ -18,6 +19,9 @@ require (
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/deckarep/golang-set/v2 v2.8.0 // indirect
 	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
+	github.com/ebitengine/gomobile v0.0.0-20250923094054-ea854a63cce1 // indirect
+	github.com/ebitengine/hideconsole v1.0.0 // indirect
+	github.com/ebitengine/purego v0.9.1 // indirect
 	github.com/flowchartsman/retry v1.2.0 // indirect
 	github.com/google/btree v1.1.3 // indirect
 	github.com/google/uuid v1.6.0 // indirect
@@ -30,6 +34,7 @@ require (
 	github.com/hashicorp/golang-lru v1.0.2 // indirect
 	github.com/hashicorp/logutils v1.0.0 // indirect
 	github.com/hashicorp/memberlist v0.5.3 // indirect
+	github.com/jezek/xgb v1.1.1 // indirect
 	github.com/klauspost/compress v1.18.1 // indirect
 	github.com/klauspost/cpuid/v2 v2.3.0 // indirect
 	github.com/miekg/dns v1.1.68 // indirect
