@@ -11,7 +11,7 @@ import (
 const (
 	numRedAtStart   = 5
 	numBlueAtStart  = 30
-	detectionRadius = 10
+	detectionRadius = 5
 	defenseRadius   = 5
 )
 

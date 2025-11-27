@@ -127,13 +127,31 @@ func (w *WorldActor) rebuildGrid() {
 }
 
 func (w *WorldActor) getCellSize() float64 {
-	cellSize := math.Min(w.detectionRadius, 10)
-	return cellSize
+	// Use the largest radius to ensure our 3x3 grid check covers everything
+	maxRadius := math.Max(w.detectionRadius, w.defenseRadius)
+	// Clamp to a minimum of 10 to avoid tiny grids or div by zero
+	return math.Max(maxRadius, 10.0)
+}
+func (w *WorldActor) getCellIndices(x, y float64) (int, int) {
+	cs := w.getCellSize()
+	return int(x / cs), int(y / cs)
 }
 
-func (w *WorldActor) getCellKey(x, y float64) string {
-	cellSize := w.getCellSize()
-	return fmt.Sprintf("%d:%d", int(x/cellSize), int(y/cellSize))
+// getNearbyActors retrieves all the actors in grids located in and around x,y  (3x3 Grid)
+func (w *WorldActor) getNearbyActors(x, y float64) []*ActorState {
+	gx, gy := w.getCellIndices(x, y)
+	var neighbors []*ActorState
+
+	// Loop through X-1 to X+1 and Y-1 to Y+1
+	for i := gx - 1; i <= gx+1; i++ {
+		for j := gy - 1; j <= gy+1; j++ {
+			key := fmt.Sprintf("%d:%d", i, j)
+			if actors, ok := w.grid[key]; ok {
+				neighbors = append(neighbors, actors...)
+			}
+		}
+	}
+	return neighbors
 }
 
 func (w *WorldActor) processInteractions(ctx *actor.ReceiveContext) {
@@ -147,13 +165,12 @@ func (w *WorldActor) processInteractions(ctx *actor.ReceiveContext) {
 			continue
 		}
 
-		// Optimization: Only check neighbors in current and adjacent grid cells
-		// (omitted full neighbor check for brevity, assuming simple loop for now)
-		// In a real grid, you'd calculate keys for (x-1, y-1) to (x+1, y+1)
-
 		var visibleTargets []*ActorState
+		// OPTIMIZATION: Get only nearby actors (Prey Candidates)
+		// This replaces `range w.actors` with a much smaller list
+		potentialPrey := w.getNearbyActors(red.PositionX, red.PositionY)
 
-		for _, other := range w.actors {
+		for _, other := range potentialPrey {
 			if other.Color == ColorBlue {
 				distSq := distSquared(red, other)
 
@@ -164,9 +181,14 @@ func (w *WorldActor) processInteractions(ctx *actor.ReceiveContext) {
 
 				// Collision
 				if distSq < contactSq {
+					// === COMBAT LOGIC ===
 					// Check Defense
 					defenders := 0
-					for _, def := range w.actors {
+					// OPTIMIZATION: Get nearby actors around the VICTIM
+					// We need to look around 'other', not 'red', though they are close.
+					potentialDefenders := w.getNearbyActors(other.PositionX, other.PositionY)
+					for _, def := range potentialDefenders {
+						// A defender must be Blue, not the victim itself, and close enough
 						if def.Color == ColorBlue && def.Id != other.Id {
 							if distSquared(other, def) < defSq {
 								defenders++
@@ -180,18 +202,23 @@ func (w *WorldActor) processInteractions(ctx *actor.ReceiveContext) {
 					targetPID, _ := ctx.ActorSystem().LocalActor(other.Id)
 					myPID, _ := ctx.ActorSystem().LocalActor(red.Id) // Inefficient lookup, better to cache PIDs
 
+					// Defense Mechanism
 					if defenders >= 3 {
-						// Red converts to Blue
-						ctx.Tell(myPID, &Convert{TargetColor: ColorBlue})
+						// DEFENSE SUCCESS: Red converts to Blue
+						if myPID != nil {
+							ctx.Tell(myPID, &Convert{TargetColor: ColorBlue})
+						}
 					} else {
-						// Blue converts to Red
-						ctx.Tell(targetPID, &Convert{TargetColor: ColorRed})
+						// DEFENSE FAILED: Blue converts to Red
+						if targetPID != nil {
+							ctx.Tell(targetPID, &Convert{TargetColor: ColorRed})
+						}
 					}
 				}
 			}
 		}
 
-		// Send Perception
+		// Send Perception Update
 		if len(visibleTargets) > 0 {
 			myPID, _ := ctx.ActorSystem().LocalActor(red.Id)
 			ctx.Tell(myPID, &Perception{Targets: visibleTargets})
