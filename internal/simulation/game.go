@@ -1,4 +1,4 @@
-package individual
+package simulation
 
 import (
 	"context"
@@ -160,7 +160,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 
 func (g *Game) Layout(w, h int) (int, int) { return 640, 480 }
 
-func GetNewGame(ctx context.Context, numRed, numBlue int) *Game {
+func GetNewGame(ctx context.Context, numRed, numBlue int, detectionRadius, defenseRadius float64) *Game {
 
 	system, _ := actor.NewActorSystem("SwarmWorld",
 		actor.WithLogger(golog.DiscardLogger),
@@ -190,7 +190,7 @@ func GetNewGame(ctx context.Context, numRed, numBlue int) *Game {
 	// Detection: Range 0 to 300, Start at 200, Positioned at top-left
 	sDet := &Slider{
 		Label: "Detection Radius",
-		Value: 200,
+		Value: detectionRadius,
 		Min:   0, Max: 300,
 		X: 10, Y: 20, W: 200, H: 20,
 	}
@@ -198,7 +198,7 @@ func GetNewGame(ctx context.Context, numRed, numBlue int) *Game {
 	// Defense: Range 0 to 100, Start at 25, Positioned below Detection
 	sDef := &Slider{
 		Label: "Defense Radius",
-		Value: 25,
+		Value: defenseRadius,
 		Min:   0, Max: 100,
 		X: 10, Y: 70, W: 200, H: 20,
 	}

@@ -5,11 +5,15 @@ import (
 	"log"
 
 	"github.com/hajimehoshi/ebiten/v2"
-	"github.com/lao-tseu-is-alive/go-swarm-simulation/internal/individual"
+	"github.com/lao-tseu-is-alive/go-swarm-simulation/internal/simulation"
 )
 
-const numRedAtStart = 3
-const numBlueAtStart = 20
+const (
+	numRedAtStart  = 3
+	numBlueAtStart = 5
+	detectionRadius
+	defenseRadius
+)
 
 func main() {
 	ctx := context.Background()
@@ -17,7 +21,7 @@ func main() {
 	ebiten.SetWindowSize(640, 480)
 	ebiten.SetWindowTitle("Swarm: Red vs Blue (Defense Mode)")
 
-	game := individual.GetNewGame(ctx, numRedAtStart, numBlueAtStart)
+	game := simulation.GetNewGame(ctx, numRedAtStart, numBlueAtStart, detectionRadius, defenseRadius)
 	defer game.System.Stop(ctx)
 	err := ebiten.RunGame(game)
 	if err != nil {

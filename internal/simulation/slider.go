@@ -1,4 +1,4 @@
-package individual
+package simulation
 
 import (
 	"image/color"

@@ -4,7 +4,7 @@
 // 	protoc        v6.32.1
 // source: pb/simulation.proto
 
-package individual
+package simulation
 
 import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
