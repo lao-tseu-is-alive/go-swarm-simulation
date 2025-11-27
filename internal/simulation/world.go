@@ -25,10 +25,13 @@ type WorldActor struct {
 	// Config for spawning
 	numRed  int
 	numBlue int
+	// Store World Dimensions
+	width  float64
+	height float64
 }
 
 // NewWorldActor creates the world logic unit
-func NewWorldActor(snapshotCh chan<- *WorldSnapshot, numRed, numBlue int, detR, defR float64) *WorldActor {
+func NewWorldActor(snapshotCh chan<- *WorldSnapshot, numRed, numBlue int, detR, defR, w, h float64) *WorldActor {
 	return &WorldActor{
 		actors:          make(map[string]*ActorState),
 		grid:            make(map[string][]*ActorState),
@@ -37,6 +40,8 @@ func NewWorldActor(snapshotCh chan<- *WorldSnapshot, numRed, numBlue int, detR, 
 		numBlue:         numBlue,
 		detectionRadius: detR,
 		defenseRadius:   defR,
+		width:           w,
+		height:          h,
 	}
 }
 
@@ -102,15 +107,15 @@ func (w *WorldActor) Receive(ctx *actor.ReceiveContext) {
 
 func (w *WorldActor) spawnSwarm(ctx *actor.ReceiveContext) {
 	for i := 0; i < w.numRed; i++ {
-		name := fmt.Sprintf("Red-%d", i)
+		name := fmt.Sprintf("Red-%03d", i)
 		// Spawn using ReceiveContext.Spawn (creates a child)
-		pid := ctx.Spawn(name, NewIndividual(ColorRed, 50+float64(i)*20, 100))
+		pid := ctx.Spawn(name, NewIndividual(ColorRed, 50+float64(i)*20, 150, w.width, w.height))
 		w.pids = append(w.pids, pid)
 	}
 
 	for i := 0; i < w.numBlue; i++ {
-		name := fmt.Sprintf("Blue-%d-%d", i%10, i/10)
-		pid := ctx.Spawn(name, NewIndividual(ColorBlue, 300, 100))
+		name := fmt.Sprintf("Blue-%03d", i)
+		pid := ctx.Spawn(name, NewIndividual(ColorBlue, float64(i)+300, 250, w.width, w.height))
 		w.pids = append(w.pids, pid)
 	}
 }

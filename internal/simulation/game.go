@@ -26,10 +26,12 @@ type Game struct {
 	// UI Sliders
 	sliderDetection *Slider
 	sliderDefense   *Slider
-	worldState      map[string]*ActorState // if you still use this cache in game.go
+	// Store World Dimensions
+	width  int
+	height int
 }
 
-func GetNewGame(ctx context.Context, numRed, numBlue int, detectionRadius, defenseRadius float64) *Game {
+func GetNewGame(ctx context.Context, numRed, numBlue int, detectionRadius, defenseRadius, worldWidth, worldHeight float64) *Game {
 	// 1. Start Actor System
 	system, _ := actor.NewActorSystem("SwarmWorld",
 		actor.WithLogger(golog.DefaultLogger),
@@ -41,7 +43,7 @@ func GetNewGame(ctx context.Context, numRed, numBlue int, detectionRadius, defen
 
 	// 3. SPAWN THE WORLD ACTOR
 	// Note: We pass the settings so the World can spawn the individuals
-	worldActor := NewWorldActor(snapshotCh, numRed, numBlue, detectionRadius, defenseRadius)
+	worldActor := NewWorldActor(snapshotCh, numRed, numBlue, detectionRadius, defenseRadius, worldWidth, worldHeight)
 	worldPID, _ := system.Spawn(ctx, "World", worldActor)
 
 	// 4. Initialize Sliders (UI only)
@@ -59,10 +61,11 @@ func GetNewGame(ctx context.Context, numRed, numBlue int, detectionRadius, defen
 		ctx:             ctx,
 		worldPID:        worldPID,
 		snapshotCh:      snapshotCh,
+		lastState:       &WorldSnapshot{}, // Avoid nil pointer
 		sliderDetection: sDet,
 		sliderDefense:   sDef,
-		lastState:       &WorldSnapshot{},             // Avoid nil pointer
-		worldState:      make(map[string]*ActorState), // if you still use this cache in game.go
+		width:           int(worldWidth),
+		height:          int(worldHeight),
 	}
 }
 
@@ -125,4 +128,4 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	ebitenutil.DebugPrint(screen, msg)
 }
 
-func (g *Game) Layout(w, h int) (int, int) { return 640, 480 }
+func (g *Game) Layout(w, h int) (int, int) { return g.width, g.height }

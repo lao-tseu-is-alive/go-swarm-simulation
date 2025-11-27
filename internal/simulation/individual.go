@@ -20,18 +20,22 @@ type Individual struct {
 	X, Y           float64
 	vx, vy         float64
 	visibleTargets []*ActorState
+	worldWidth     float64
+	worldHeight    float64
 }
 
 var _ actor.Actor = (*Individual)(nil)
 
-func NewIndividual(color string, startX, startY float64) *Individual {
+func NewIndividual(color string, startX, startY, width, height float64) *Individual {
 	return &Individual{
 		Color: color,
 		X:     startX,
 		Y:     startY,
 		// Initialize with random velocity
-		vx: (rand.Float64() - 0.5) * 2,
-		vy: (rand.Float64() - 0.5) * 2,
+		vx:          (rand.Float64() - 0.5) * 2,
+		vy:          (rand.Float64() - 0.5) * 2,
+		worldWidth:  width,
+		worldHeight: height,
 	}
 }
 
@@ -122,21 +126,20 @@ func (i *Individual) updatePosition() {
 	i.Y += i.vy
 
 	// 3. World Bounds
-	screenWidth, screenHeight := 640.0, 480.0
 	if i.X < 0 {
 		i.X = 0
 		i.vx *= -1
 	}
-	if i.X > screenWidth {
-		i.X = screenWidth
+	if i.X > i.worldWidth {
+		i.X = i.worldWidth
 		i.vx *= -1
 	}
 	if i.Y < 0 {
 		i.Y = 0
 		i.vy *= -1
 	}
-	if i.Y > screenHeight {
-		i.Y = screenHeight
+	if i.Y > i.worldHeight {
+		i.Y = i.worldHeight
 		i.vy *= -1
 	}
 }
