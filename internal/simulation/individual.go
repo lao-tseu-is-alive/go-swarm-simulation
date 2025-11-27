@@ -19,25 +19,26 @@ type Individual struct {
 	Color          string
 	X, Y           float64
 	vx, vy         float64
-	reportCh       chan<- *ActorState
 	visibleTargets []*ActorState
 }
 
 var _ actor.Actor = (*Individual)(nil)
 
-func NewIndividual(color string, startX, startY float64, reportCh chan<- *ActorState) *Individual {
+func NewIndividual(color string, startX, startY float64) *Individual {
 	return &Individual{
 		Color: color,
 		X:     startX,
 		Y:     startY,
 		// Initialize with random velocity
-		vx:       (rand.Float64() - 0.5) * 2,
-		vy:       (rand.Float64() - 0.5) * 2,
-		reportCh: reportCh,
+		vx: (rand.Float64() - 0.5) * 2,
+		vy: (rand.Float64() - 0.5) * 2,
 	}
 }
 
 func (i *Individual) PreStart(ctx *actor.Context) error {
+	// ctx.ActorName() might be deprecated in v3 favor of ctx.Name()
+	// but let's assume ctx.ActorName() or ctx.Name() works.
+	// If Error: use ctx.Self().Name() in Receive
 	ctx.ActorSystem().Logger().Infof("Born: %s (%s) at %.2f, %.2f", ctx.ActorName(), i.Color, i.X, i.Y)
 	return nil
 }
@@ -46,6 +47,8 @@ func (i *Individual) Receive(ctx *actor.ReceiveContext) {
 	switch msg := ctx.Message().(type) {
 	case *goaktpb.PostStart:
 		ctx.Logger().Infof("%s started", ctx.Self().Name())
+		// Initialize ID here
+		i.ID = ctx.Self().Name()
 
 	case *Perception:
 		i.visibleTargets = msg.Targets
@@ -64,13 +67,19 @@ func (i *Individual) Receive(ctx *actor.ReceiveContext) {
 
 	case *Tick:
 		i.updatePosition()
-		i.reportCh <- &ActorState{
+		// Prepare state to send back to World
+		state := &ActorState{
 			Id:        ctx.Self().Name(),
 			Color:     i.Color,
 			PositionX: i.X,
 			PositionY: i.Y,
 		}
 
+		// REPORT TO WORLD
+		// Since 'Tick' came from the World, ctx.Sender() IS the World.
+		if ctx.Sender() != nil && ctx.Sender() != ctx.ActorSystem().NoSender() {
+			ctx.Tell(ctx.Sender(), state)
+		}
 	case *GetState:
 		response := &ActorState{
 			Id:        ctx.Self().Name(),
@@ -86,6 +95,7 @@ func (i *Individual) Receive(ctx *actor.ReceiveContext) {
 }
 
 func (i *Individual) PostStop(ctx *actor.Context) error {
+	ctx.ActorSystem().Logger().Infof("Death : %s", ctx.ActorName())
 	return nil
 }
 

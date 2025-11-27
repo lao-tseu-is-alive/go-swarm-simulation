@@ -28,3 +28,19 @@ message Perception {
 message Convert {
   string target_color = 1;
 }
+
+// Sent by Individual -> World
+message ReportStatus {
+  ActorState state = 1;
+}
+
+// Sent by World -> UI (via channel, or actor if UI is an actor)
+message WorldSnapshot {
+  repeated ActorState actors = 1;
+}
+
+// UpdateConfig Simple struct to update config (can be moved to proto)
+message UpdateConfig {
+	double DetectionRadius = 1;
+	double DefenseRadius   = 2;
+}

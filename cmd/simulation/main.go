@@ -9,10 +9,10 @@ import (
 )
 
 const (
-	numRedAtStart  = 3
-	numBlueAtStart = 5
-	detectionRadius
-	defenseRadius
+	numRedAtStart   = 5
+	numBlueAtStart  = 30
+	detectionRadius = 10
+	defenseRadius   = 5
 )
 
 func main() {
