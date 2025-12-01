@@ -49,8 +49,10 @@ func (i *Individual) Receive(ctx *actor.ReceiveContext) {
 	// Determine initial behavior based on color
 	if i.Color == ColorRed {
 		ctx.Become(i.RedBehavior)
+		i.RedBehavior(ctx) // process current message
 	} else {
 		ctx.Become(i.BlueBehavior)
+		i.BlueBehavior(ctx)
 	}
 
 }
@@ -74,23 +76,11 @@ func (i *Individual) RedBehavior(ctx *actor.ReceiveContext) {
 			i.chaseClosestTarget()
 		} else {
 			// Random jitter if no target
-			i.vx += (rand.Float64() - 0.5) * 0.2
+			i.vx += (rand.Float64() - 0.5) * 0.1
 			i.vy += (rand.Float64() - 0.5) * 0.2
 		}
 		i.updatePosition()
-		// Prepare state to send back to World
-		state := &ActorState{
-			Id:        ctx.Self().Name(),
-			Color:     i.Color,
-			PositionX: i.X,
-			PositionY: i.Y,
-		}
-
-		// REPORT TO WORLD
-		// Since 'Tick' came from the World, ctx.Sender() IS the World.
-		if ctx.Sender() != nil && ctx.Sender() != ctx.ActorSystem().NoSender() {
-			ctx.Tell(ctx.Sender(), state)
-		}
+		i.reportState(ctx)
 
 	case *Perception:
 		i.visibleTargets = msg.Targets
@@ -136,19 +126,7 @@ func (i *Individual) BlueBehavior(ctx *actor.ReceiveContext) {
 		i.vy += 0.05
 		i.updatePosition()
 		//i.applyFlocking() // No "if blue" needed!
-		// Prepare state to send back to World
-		state := &ActorState{
-			Id:        ctx.Self().Name(),
-			Color:     i.Color,
-			PositionX: i.X,
-			PositionY: i.Y,
-		}
-
-		// REPORT TO WORLD
-		// Since 'Tick' came from the World, ctx.Sender() IS the World.
-		if ctx.Sender() != nil && ctx.Sender() != ctx.ActorSystem().NoSender() {
-			ctx.Tell(ctx.Sender(), state)
-		}
+		i.reportState(ctx)
 
 	//case *Perception:
 	//	i.visibleFriends = msg.Targets // Different logic for perception!
@@ -173,6 +151,22 @@ func (i *Individual) BlueBehavior(ctx *actor.ReceiveContext) {
 		}
 		ctx.Response(response)
 
+	}
+}
+
+func (i *Individual) reportState(ctx *actor.ReceiveContext) {
+	// Prepare state to send back to World
+	state := &ActorState{
+		Id:        ctx.Self().Name(),
+		Color:     i.Color,
+		PositionX: i.X,
+		PositionY: i.Y,
+	}
+
+	// REPORT TO WORLD
+	// Since 'Tick' came from the World, ctx.Sender() IS the World.
+	if ctx.Sender() != nil && ctx.Sender() != ctx.ActorSystem().NoSender() {
+		ctx.Tell(ctx.Sender(), state)
 	}
 }
 
