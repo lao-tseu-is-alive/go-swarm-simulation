@@ -16,6 +16,7 @@ type gridKey struct {
 type WorldActor struct {
 	actors    map[string]*ActorState
 	pids      []*actor.PID // Keep track of children
+	pidsCache map[string]*actor.PID
 	uiChannel chan<- *WorldSnapshot
 	// Optimization: Spatial Hashing
 	// Map gridKey -> list of actors in that cell
@@ -38,6 +39,7 @@ type WorldActor struct {
 func NewWorldActor(snapshotCh chan<- *WorldSnapshot, numRed, numBlue int, detR, defR, w, h float64) *WorldActor {
 	return &WorldActor{
 		actors:          make(map[string]*ActorState),
+		pidsCache:       make(map[string]*actor.PID),
 		grid:            make(map[gridKey][]*ActorState),
 		snapshotCh:      snapshotCh,
 		numRed:          numRed,
@@ -115,12 +117,14 @@ func (w *WorldActor) spawnSwarm(ctx *actor.ReceiveContext) {
 		// Spawn using ReceiveContext.Spawn (creates a child)
 		pid := ctx.Spawn(name, NewIndividual(ColorRed, 50+float64(i)*20, 150, w.width, w.height))
 		w.pids = append(w.pids, pid)
+		w.pidsCache[name] = pid
 	}
 
 	for i := 0; i < w.numBlue; i++ {
 		name := fmt.Sprintf("Blue-%03d", i)
 		pid := ctx.Spawn(name, NewIndividual(ColorBlue, float64(i)+300, 250, w.width, w.height))
 		w.pids = append(w.pids, pid)
+		w.pidsCache[name] = pid
 	}
 }
 
@@ -209,8 +213,8 @@ func (w *WorldActor) processInteractions(ctx *actor.ReceiveContext) {
 					// Conversion Logic
 					// Note: Lookups by ID string are slow; in production, cache PIDs or use the Grid
 					// For now, we use the System to find the local actor by name (ID)
-					targetPID, _ := ctx.ActorSystem().LocalActor(other.Id)
-					myPID, _ := ctx.ActorSystem().LocalActor(red.Id) // Inefficient lookup, better to cache PIDs
+					targetPID := w.pidsCache[other.Id]
+					myPID := w.pidsCache[red.Id] // Inefficient lookup, better to cache PIDs
 
 					// Defense Mechanism
 					if defenders >= 3 {
@@ -230,7 +234,7 @@ func (w *WorldActor) processInteractions(ctx *actor.ReceiveContext) {
 
 		// Send Perception Update
 		if len(visibleTargets) > 0 {
-			myPID, _ := ctx.ActorSystem().LocalActor(red.Id)
+			myPID := w.pidsCache[red.Id]
 			ctx.Tell(myPID, &Perception{Targets: visibleTargets})
 		}
 	}
