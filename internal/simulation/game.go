@@ -10,6 +10,7 @@ import (
 	"github.com/hajimehoshi/ebiten/v2/vector"
 	"github.com/tochemey/goakt/v3/actor"
 	golog "github.com/tochemey/goakt/v3/log"
+	"google.golang.org/protobuf/runtime/protoimpl"
 )
 
 type Game struct {
@@ -56,11 +57,20 @@ func GetNewGame(ctx context.Context, cfg *Config) *Game {
 	}
 
 	return &Game{
-		System:          system,
-		ctx:             ctx,
-		worldPID:        worldPID,
-		snapshotCh:      snapshotCh,
-		lastState:       &WorldSnapshot{}, // Avoid nil pointer
+		System:     system,
+		ctx:        ctx,
+		worldPID:   worldPID,
+		snapshotCh: snapshotCh,
+		lastState: &WorldSnapshot{
+			state:         protoimpl.MessageState{},
+			Actors:        nil,
+			RedCount:      0,
+			BlueCount:     0,
+			IsGameOver:    false,
+			Winner:        "",
+			unknownFields: nil,
+			sizeCache:     0,
+		}, // Avoid nil pointer
 		sliderDetection: sDet,
 		sliderDefense:   sDef,
 		cfg:             cfg,
@@ -72,23 +82,26 @@ func (g *Game) Update() error {
 	g.sliderDetection.Update()
 	g.sliderDefense.Update()
 
-	// 2. Send Updated Config to World (Fire and Forget)
-	// Only send if changed (optimization omitted for brevity)
-	g.System.NoSender().Tell(g.ctx, g.worldPID, &UpdateConfig{
-		DetectionRadius: g.sliderDetection.Value,
-		DefenseRadius:   g.sliderDefense.Value,
-	})
-
-	// 3. Trigger Simulation Step
-	// We tell the World: "It's time to process a frame"
-	g.System.NoSender().Tell(g.ctx, g.worldPID, &Tick{})
-
-	// 4. Retrieve Latest State (Non-blocking)
+	// 2. Retrieve Latest State (Non-blocking) EARLY, so we can check IsGameOver before ticking
 	select {
 	case snap := <-g.snapshotCh:
 		g.lastState = snap
 	default:
 		// Use previous state if new one isn't ready
+	}
+	// ONLY send a Tick if the game is NOT over.
+	// This effectively "freezes" the simulation in the final state.
+	if !g.lastState.IsGameOver {
+		// 3. Send Updated Config to World (Fire and Forget)
+		// Only send if changed (optimization omitted for brevity)
+		g.System.NoSender().Tell(g.ctx, g.worldPID, &UpdateConfig{
+			DetectionRadius: g.sliderDetection.Value,
+			DefenseRadius:   g.sliderDefense.Value,
+		})
+
+		// 4. Trigger Simulation Step
+		// We tell the World: "It's time to process a frame"
+		g.System.NoSender().Tell(g.ctx, g.worldPID, &Tick{})
 	}
 
 	return nil
@@ -123,10 +136,19 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	// 3. Draw the New Stats Bar
 	g.drawStatsBar(screen)
 
+	// 4. Draw Game Over Overlay
+	if g.lastState.IsGameOver {
+		// Simple centered text
+		msg := fmt.Sprintf("GAME OVER\n%s is the WINNER !", g.lastState.Winner)
+		// You can use basic printing or fancy vector text here
+		ebitenutil.DebugPrintAt(screen, msg, int(g.cfg.WorldWidth/2-40), int(g.cfg.WorldHeight/2))
+	}
+
 	msg := fmt.Sprintf("Detection: %.0f\n\n\nDefense: %.0f\n\n",
 		g.sliderDetection.Value,
 		g.sliderDefense.Value)
 	ebitenutil.DebugPrint(screen, msg)
+
 }
 
 func (g *Game) drawStatsBar(screen *ebiten.Image) {

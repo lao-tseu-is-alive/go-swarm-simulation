@@ -39,6 +39,8 @@ message WorldSnapshot {
   repeated ActorState actors = 1;
   int32 red_count = 2;
   int32 blue_count = 3;
+  bool is_game_over = 4;
+  string winner = 5;
 }
 
 // UpdateConfig Simple struct to update config (can be moved to proto)

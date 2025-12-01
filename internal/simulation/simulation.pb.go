@@ -313,6 +313,8 @@ type WorldSnapshot struct {
 	Actors        []*ActorState          `protobuf:"bytes,1,rep,name=actors,proto3" json:"actors,omitempty"`
 	RedCount      int32                  `protobuf:"varint,2,opt,name=red_count,json=redCount,proto3" json:"red_count,omitempty"`
 	BlueCount     int32                  `protobuf:"varint,3,opt,name=blue_count,json=blueCount,proto3" json:"blue_count,omitempty"`
+	IsGameOver    bool                   `protobuf:"varint,4,opt,name=is_game_over,json=isGameOver,proto3" json:"is_game_over,omitempty"`
+	Winner        string                 `protobuf:"bytes,5,opt,name=winner,proto3" json:"winner,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -366,6 +368,20 @@ func (x *WorldSnapshot) GetBlueCount() int32 {
 		return x.BlueCount
 	}
 	return 0
+}
+
+func (x *WorldSnapshot) GetIsGameOver() bool {
+	if x != nil {
+		return x.IsGameOver
+	}
+	return false
+}
+
+func (x *WorldSnapshot) GetWinner() string {
+	if x != nil {
+		return x.Winner
+	}
+	return ""
 }
 
 // UpdateConfig Simple struct to update config (can be moved to proto)
@@ -445,12 +461,15 @@ const file_pb_simulation_proto_rawDesc = "" +
 	"\aConvert\x12!\n" +
 	"\ftarget_color\x18\x01 \x01(\tR\vtargetColor\"4\n" +
 	"\fReportStatus\x12$\n" +
-	"\x05state\x18\x01 \x01(\v2\x0e.pb.ActorStateR\x05state\"s\n" +
+	"\x05state\x18\x01 \x01(\v2\x0e.pb.ActorStateR\x05state\"\xad\x01\n" +
 	"\rWorldSnapshot\x12&\n" +
 	"\x06actors\x18\x01 \x03(\v2\x0e.pb.ActorStateR\x06actors\x12\x1b\n" +
 	"\tred_count\x18\x02 \x01(\x05R\bredCount\x12\x1d\n" +
 	"\n" +
-	"blue_count\x18\x03 \x01(\x05R\tblueCount\"^\n" +
+	"blue_count\x18\x03 \x01(\x05R\tblueCount\x12 \n" +
+	"\fis_game_over\x18\x04 \x01(\bR\n" +
+	"isGameOver\x12\x16\n" +
+	"\x06winner\x18\x05 \x01(\tR\x06winner\"^\n" +
 	"\fUpdateConfig\x12(\n" +
 	"\x0fDetectionRadius\x18\x01 \x01(\x01R\x0fDetectionRadius\x12$\n" +
 	"\rDefenseRadius\x18\x02 \x01(\x01R\rDefenseRadiusB5Z3github.com/lao-tseu-is-alive/go-swarm-simulation/pbb\x06proto3"

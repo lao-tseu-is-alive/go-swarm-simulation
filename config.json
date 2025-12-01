@@ -3,8 +3,8 @@
     "worldHeight": 800,
     "numRedAtStart": 5,
     "numBlueAtStart": 30,
-    "detectionRadius": 50,
-    "defenseRadius": 50,
+    "detectionRadius": 70,
+    "defenseRadius": 40,
     "contactRadius": 30,
     "maxSpeed": 5.0,
     "aggression": 1.0

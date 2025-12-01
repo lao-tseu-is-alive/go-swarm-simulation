@@ -101,6 +101,21 @@ func (w *WorldActor) Receive(ctx *actor.ReceiveContext) {
 				snapshot.BlueCount++
 			}
 		}
+		// We add a check: (snapshot.RedCount + snapshot.BlueCount > 0)
+		// This ensures we don't trigger Game Over during the first few frames
+		// when the map is still empty/initializing.
+		totalPopulation := snapshot.RedCount + snapshot.BlueCount
+
+		if totalPopulation > 0 {
+			// Check Victory Condition
+			if snapshot.RedCount == 0 {
+				snapshot.IsGameOver = true
+				snapshot.Winner = ColorBlue
+			} else if snapshot.BlueCount == 0 {
+				snapshot.IsGameOver = true
+				snapshot.Winner = ColorRed
+			}
+		}
 
 		// Non-blocking send to avoid slowing down simulation if UI is slow
 		select {
