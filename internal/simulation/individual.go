@@ -46,28 +46,37 @@ func (i *Individual) PreStart(ctx *actor.Context) error {
 }
 
 func (i *Individual) Receive(ctx *actor.ReceiveContext) {
+	// Determine initial behavior based on color
+	if i.Color == ColorRed {
+		ctx.Become(i.RedBehavior)
+	} else {
+		ctx.Become(i.BlueBehavior)
+	}
+
+}
+
+func (i *Individual) PostStop(ctx *actor.Context) error {
+	ctx.ActorSystem().Logger().Infof("Death : %s", ctx.ActorName())
+	return nil
+}
+
+// RedBehavior Behavior for RED (Aggressive)
+func (i *Individual) RedBehavior(ctx *actor.ReceiveContext) {
 	switch msg := ctx.Message().(type) {
 	case *goaktpb.PostStart:
 		ctx.Logger().Infof("%s started", ctx.Self().Name())
 		// Initialize ID here
 		i.ID = ctx.Self().Name()
 
-	case *Perception:
-		i.visibleTargets = msg.Targets
-
-	// NEW: Handle Conversion
-	case *Convert:
-		if i.Color != msg.TargetColor {
-			ctx.Logger().Infof("%s converting from %s to %s", ctx.Self().Name(), i.Color, msg.TargetColor)
-			i.Color = msg.TargetColor
-			i.visibleTargets = nil // Clear memory of old enemies
-
-			// Reaction jump: Push them slightly away to visualize the impact
-			i.vx *= -1.5
-			i.vy *= -1.5
-		}
-
 	case *Tick:
+		// Aggressive Chase behavior
+		if len(i.visibleTargets) > 0 {
+			i.chaseClosestTarget()
+		} else {
+			// Random jitter if no target
+			i.vx += (rand.Float64() - 0.5) * 0.2
+			i.vy += (rand.Float64() - 0.5) * 0.2
+		}
 		i.updatePosition()
 		// Prepare state to send back to World
 		state := &ActorState{
@@ -82,6 +91,22 @@ func (i *Individual) Receive(ctx *actor.ReceiveContext) {
 		if ctx.Sender() != nil && ctx.Sender() != ctx.ActorSystem().NoSender() {
 			ctx.Tell(ctx.Sender(), state)
 		}
+
+	case *Perception:
+		i.visibleTargets = msg.Targets
+
+		// Handle Conversion
+	case *Convert:
+		if msg.TargetColor == ColorBlue {
+			ctx.Logger().Infof("%s converting from %s to %s", ctx.Self().Name(), i.Color, msg.TargetColor)
+			i.Color = ColorBlue
+			ctx.Become(i.BlueBehavior) // <--- The Magic thank's to Actor behaviors
+			i.visibleTargets = nil     // Clear memory of old enemies
+
+			// Reaction jump: Push them slightly away to visualize the impact
+			i.vx *= -1.5
+			i.vy *= -1.5
+		}
 	case *GetState:
 		response := &ActorState{
 			Id:        ctx.Self().Name(),
@@ -94,31 +119,64 @@ func (i *Individual) Receive(ctx *actor.ReceiveContext) {
 	default:
 		ctx.Unhandled()
 	}
+
 }
 
-func (i *Individual) PostStop(ctx *actor.Context) error {
-	ctx.ActorSystem().Logger().Infof("Death : %s", ctx.ActorName())
-	return nil
-}
-
-func (i *Individual) updatePosition() {
-	// 1. Behavior Logic
-	if i.Color == ColorRed {
-		// Aggressive Chase behavior
-		if len(i.visibleTargets) > 0 {
-			i.chaseClosestTarget()
-		} else {
-			// Random jitter if no target
-			i.vx += (rand.Float64() - 0.5) * 0.2
-			i.vy += (rand.Float64() - 0.5) * 0.2
-		}
-	} else {
+// BlueBehavior  Behavior for BLUE (Flocking)
+func (i *Individual) BlueBehavior(ctx *actor.ReceiveContext) {
+	switch msg := ctx.Message().(type) {
+	case *goaktpb.PostStart:
+		ctx.Logger().Infof("%s started", ctx.Self().Name())
+		// Initialize ID here
+		i.ID = ctx.Self().Name()
+	case *Tick:
 		// Blue: Consensual/Swarm behavior (Cohesion could be added here)
 		// For now, they stabilize and drift
 		i.vx += 0.05
 		i.vy += 0.05
-	}
+		i.updatePosition()
+		//i.applyFlocking() // No "if blue" needed!
+		// Prepare state to send back to World
+		state := &ActorState{
+			Id:        ctx.Self().Name(),
+			Color:     i.Color,
+			PositionX: i.X,
+			PositionY: i.Y,
+		}
 
+		// REPORT TO WORLD
+		// Since 'Tick' came from the World, ctx.Sender() IS the World.
+		if ctx.Sender() != nil && ctx.Sender() != ctx.ActorSystem().NoSender() {
+			ctx.Tell(ctx.Sender(), state)
+		}
+
+	//case *Perception:
+	//	i.visibleFriends = msg.Targets // Different logic for perception!
+
+	case *Convert:
+		if msg.TargetColor == ColorRed {
+			ctx.Logger().Infof("%s converting from %s to %s", ctx.Self().Name(), i.Color, msg.TargetColor)
+			i.Color = ColorRed
+			ctx.Become(i.RedBehavior) // <--- The Magic thank's to Actor behaviors
+			i.visibleTargets = nil    // Clear memory of old enemies
+
+			// Reaction jump: Push them slightly away to visualize the impact
+			i.vx *= -1.5
+			i.vy *= -1.5
+		}
+	case *GetState:
+		response := &ActorState{
+			Id:        ctx.Self().Name(),
+			Color:     i.Color,
+			PositionX: i.X,
+			PositionY: i.Y,
+		}
+		ctx.Response(response)
+
+	}
+}
+
+func (i *Individual) updatePosition() {
 	// 2. Physics Integration
 	i.X += i.vx
 	i.Y += i.vy
