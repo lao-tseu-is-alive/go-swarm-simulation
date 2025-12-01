@@ -129,13 +129,19 @@ func (w *WorldActor) spawnSwarm(ctx *actor.ReceiveContext) {
 }
 
 func (w *WorldActor) rebuildGrid() {
-	// Clear grid to reuse memory (Go 1.21+)
-	clear(w.grid)
+	// 1. Reset slices to length 0, but keep capacity! it's better then clear(w.grid)
+	// This allows to reuse the underlying arrays of the slices,
+	// reducing memory allocation to almost zero during runtime.
+	for k := range w.grid {
+		w.grid[k] = w.grid[k][:0]
+	}
 
 	cellSize := w.getCellSize()
 	for _, a := range w.actors {
 		gx, gy := int(a.PositionX/cellSize), int(a.PositionY/cellSize)
 		key := gridKey{x: gx, y: gy}
+
+		// append will reuse the existing array capacity if available
 		w.grid[key] = append(w.grid[key], a)
 	}
 }
