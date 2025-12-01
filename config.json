@@ -4,8 +4,8 @@
     "numRedAtStart": 5,
     "numBlueAtStart": 30,
     "detectionRadius": 50,
-    "defenseRadius": 40,
+    "defenseRadius": 50,
     "contactRadius": 30,
     "maxSpeed": 5.0,
-    "aggression": 0.8
+    "aggression": 1.0
 }

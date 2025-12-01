@@ -48,7 +48,7 @@ func GetNewGame(ctx context.Context, cfg *Config) *Game {
 	// 4. Initialize Sliders (UI only)
 	sDet := &Slider{
 		Label: "Detection", Value: cfg.DetectionRadius,
-		Min: 0, Max: 300, X: 10, Y: 20, W: 200, H: 20,
+		Min: 0, Max: 100, X: 10, Y: 20, W: 200, H: 20,
 	}
 	sDef := &Slider{
 		Label: "Defense", Value: cfg.DefenseRadius,
