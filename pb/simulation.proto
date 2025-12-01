@@ -37,6 +37,8 @@ message ReportStatus {
 // Sent by World -> UI (via channel, or actor if UI is an actor)
 message WorldSnapshot {
   repeated ActorState actors = 1;
+  int32 red_count = 2;
+  int32 blue_count = 3;
 }
 
 // UpdateConfig Simple struct to update config (can be moved to proto)

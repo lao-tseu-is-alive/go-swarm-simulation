@@ -166,7 +166,7 @@ func (i *Individual) chaseClosestTarget() {
 			dy /= length
 		}
 
-		agression := i.cfg.Agression // Increased aggression for better catching
+		agression := i.cfg.Aggression // Increased aggression for better catching
 		i.vx += dx * agression
 		i.vy += dy * agression
 

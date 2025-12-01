@@ -23,8 +23,8 @@ type Config struct {
 	ContactRadius   float64 `json:"contactRadius"` // Previously hardcoded 12.0
 
 	// Physics / Behavior
-	MaxSpeed  float64 `json:"maxSpeed"`  // Previously 5.0
-	Agression float64 `json:"agression"` // Previously 0.8
+	MaxSpeed   float64 `json:"maxSpeed"`   // Previously 5.0
+	Aggression float64 `json:"aggression"` // Previously 0.8
 }
 
 func DefaultConfig() *Config {
@@ -37,7 +37,7 @@ func DefaultConfig() *Config {
 		DefenseRadius:   40,
 		ContactRadius:   12,
 		MaxSpeed:        5.0,
-		Agression:       0.8,
+		Aggression:      0.8,
 	}
 }
 

@@ -10,7 +10,7 @@
     "defenseRadius": { "type": "number", "minimum": 0 },
     "contactRadius": { "type": "number", "minimum": 0 },
     "maxSpeed": { "type": "number", "minimum": 0 },
-    "agression": { "type": "number", "minimum": 0, "maximum": 5 }
+    "aggression": { "type": "number", "minimum": 0, "maximum": 5 }
   },
   "required": [
     "worldWidth",
@@ -21,6 +21,6 @@
     "defenseRadius",
     "contactRadius",
     "maxSpeed",
-    "agression"
+    "aggression"
   ]
 }

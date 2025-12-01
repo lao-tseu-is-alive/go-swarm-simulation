@@ -120,10 +120,65 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	g.sliderDetection.Draw(screen)
 	g.sliderDefense.Draw(screen)
 
-	msg := fmt.Sprintf("Detection: %.0f\n\n\nDefense: %.0f",
+	// 3. Draw the New Stats Bar
+	g.drawStatsBar(screen)
+
+	msg := fmt.Sprintf("Detection: %.0f\n\n\nDefense: %.0f\n\n",
 		g.sliderDetection.Value,
 		g.sliderDefense.Value)
 	ebitenutil.DebugPrint(screen, msg)
+}
+
+func (g *Game) drawStatsBar(screen *ebiten.Image) {
+	if g.lastState == nil {
+		return
+	}
+
+	reds := float32(g.lastState.RedCount)
+	blues := float32(g.lastState.BlueCount)
+	total := reds + blues
+
+	// Avoid divide by zero at start
+	if total == 0 {
+		return
+	}
+
+	// --- Configuration ---
+	barWidth := float32(200.0)
+	barHeight := float32(20.0)
+	marginTop := float32(10.0)
+	marginRight := float32(10.0)
+
+	// Calculate Position (Top Right)
+	// screen.Bounds().Dx() gives current window width
+	screenW := float32(screen.Bounds().Dx())
+	x := screenW - barWidth - marginRight
+	y := marginTop
+
+	// Calculate Ratios
+	redRatio := reds / total
+	redW := barWidth * redRatio
+	blueW := barWidth - redW
+
+	// --- Draw Bars ---
+	// 1. Red Bar (Left side of the stack)
+	vector.FillRect(screen, x, y, redW, barHeight, color.RGBA{R: 255, G: 50, B: 50, A: 255}, true)
+
+	// 2. Blue Bar (Right side, starts where Red ends)
+	vector.FillRect(screen, x+redW, y, blueW, barHeight, color.RGBA{R: 50, G: 100, B: 255, A: 255}, true)
+
+	// --- Draw Text Below ---
+	// Position text under the respective colors
+
+	// Red Count
+	redMsg := fmt.Sprintf("%d", int(reds))
+	ebitenutil.DebugPrintAt(screen, redMsg, int(x), int(y+barHeight+5))
+
+	// Blue Count (Aligned to the end of the bar roughly)
+	blueMsg := fmt.Sprintf("%d", int(blues))
+	// A simple hack to align right: subtract estimated text width (approx 8px per char)
+	textOffset := float32(len(blueMsg) * 8)
+	ebitenutil.DebugPrintAt(screen, blueMsg, int(x+barWidth-textOffset), int(y+barHeight+5))
 }
 
 func (g *Game) Layout(w, h int) (int, int) { return int(g.cfg.WorldWidth), int(g.cfg.WorldHeight) }

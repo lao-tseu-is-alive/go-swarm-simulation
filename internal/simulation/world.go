@@ -83,10 +83,23 @@ func (w *WorldActor) Receive(ctx *actor.ReceiveContext) {
 		// D. Push Snapshot to UI
 		// Convert map to slice for the renderer
 		snapshot := &WorldSnapshot{
-			Actors: make([]*ActorState, 0, len(w.actors)),
+			Actors:    make([]*ActorState, 0, len(w.actors)),
+			RedCount:  0,
+			BlueCount: 0,
 		}
 		for _, state := range w.actors {
 			snapshot.Actors = append(snapshot.Actors, state)
+			// "Free" calculation during iteration
+			// We could increment/decrement a counter every time a Convert message happens.
+			// However, in distributed actor systems, state drift is a common bug
+			// (e.g., an actor dies without reporting, or a conversion message is lost).
+			// Recalculating from the source of truth (w.actors map) every frame ensures
+			// UI never desynchronizes from the actual simulation state.
+			if state.Color == ColorRed {
+				snapshot.RedCount++
+			} else {
+				snapshot.BlueCount++
+			}
 		}
 
 		// Non-blocking send to avoid slowing down simulation if UI is slow
