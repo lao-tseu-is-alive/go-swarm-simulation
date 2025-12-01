@@ -9,12 +9,12 @@ import (
 )
 
 const (
-	numRedAtStart   = 5
+	numRedAtStart   = 10
 	numBlueAtStart  = 30
 	detectionRadius = 5
 	defenseRadius   = 40
-	worldWidth      = 1000
-	worldHeight     = 800
+	worldWidth      = 1200
+	worldHeight     = 1000
 )
 
 func main() {

@@ -116,3 +116,43 @@ func TestWorldActor_getNearbyActors(t *testing.T) {
 		t.Error("Should NOT find far actor (in 3,3)")
 	}
 }
+
+func BenchmarkWorldActor_rebuildGrid(b *testing.B) {
+	// Setup: 1000 actors
+	w := NewWorldActor(nil, 0, 0, 100, 50, 1000, 1000)
+	for i := 0; i < 1000; i++ {
+		id := string(rune(i))
+		w.actors[id] = &ActorState{
+			Id:        id,
+			PositionX: float64(i),
+			PositionY: float64(i),
+		}
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		w.rebuildGrid()
+	}
+}
+
+func BenchmarkWorldActor_getNearbyActors(b *testing.B) {
+	// Setup: Populated grid
+	w := NewWorldActor(nil, 0, 0, 100, 50, 1000, 1000)
+	// Fill grid with some actors
+	for i := 0; i < 1000; i++ {
+		id := string(rune(i))
+		a := &ActorState{
+			Id:        id,
+			PositionX: float64(i % 1000),
+			PositionY: float64(i % 1000),
+		}
+		w.actors[id] = a
+	}
+	w.rebuildGrid()
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		// Query middle of the map
+		w.getNearbyActors(500, 500)
+	}
+}
