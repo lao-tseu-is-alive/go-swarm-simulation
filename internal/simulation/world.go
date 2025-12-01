@@ -27,27 +27,19 @@ type WorldActor struct {
 	detectionRadius float64
 	defenseRadius   float64
 
-	// Config for spawning
-	numRed  int
-	numBlue int
-	// Store World Dimensions
-	width  float64
-	height float64
+	cfg *Config
 }
 
 // NewWorldActor creates the world logic unit
-func NewWorldActor(snapshotCh chan<- *WorldSnapshot, numRed, numBlue int, detR, defR, w, h float64) *WorldActor {
+func NewWorldActor(snapshotCh chan<- *WorldSnapshot, cfg *Config) *WorldActor {
 	return &WorldActor{
 		actors:          make(map[string]*ActorState),
 		pidsCache:       make(map[string]*actor.PID),
 		grid:            make(map[gridKey][]*ActorState),
 		snapshotCh:      snapshotCh,
-		numRed:          numRed,
-		numBlue:         numBlue,
-		detectionRadius: detR,
-		defenseRadius:   defR,
-		width:           w,
-		height:          h,
+		cfg:             cfg,
+		detectionRadius: cfg.DetectionRadius,
+		defenseRadius:   cfg.DefenseRadius,
 	}
 }
 
@@ -112,17 +104,17 @@ func (w *WorldActor) Receive(ctx *actor.ReceiveContext) {
 }
 
 func (w *WorldActor) spawnSwarm(ctx *actor.ReceiveContext) {
-	for i := 0; i < w.numRed; i++ {
+	for i := 0; i < w.cfg.NumRedAtStart; i++ {
 		name := fmt.Sprintf("Red-%03d", i)
 		// Spawn using ReceiveContext.Spawn (creates a child)
-		pid := ctx.Spawn(name, NewIndividual(ColorRed, 50+float64(i)*20, 150, w.width, w.height))
+		pid := ctx.Spawn(name, NewIndividual(ColorRed, 50+float64(i)*20, 150, w.cfg))
 		w.pids = append(w.pids, pid)
 		w.pidsCache[name] = pid
 	}
 
-	for i := 0; i < w.numBlue; i++ {
+	for i := 0; i < w.cfg.NumBlueAtStart; i++ {
 		name := fmt.Sprintf("Blue-%03d", i)
-		pid := ctx.Spawn(name, NewIndividual(ColorBlue, float64(i)+300, 250, w.width, w.height))
+		pid := ctx.Spawn(name, NewIndividual(ColorBlue, float64(i)+300, 250, w.cfg))
 		w.pids = append(w.pids, pid)
 		w.pidsCache[name] = pid
 	}
@@ -177,7 +169,7 @@ func (w *WorldActor) getNearbyActors(x, y float64) []*ActorState {
 func (w *WorldActor) processInteractions(ctx *actor.ReceiveContext) {
 	detSq := w.detectionRadius * w.detectionRadius
 	defSq := w.defenseRadius * w.defenseRadius
-	contactSq := 12.0 * 12.0
+	contactSq := w.cfg.ContactRadius * w.cfg.ContactRadius
 
 	// Iterate Red actors (Predators)
 	for _, red := range w.actors {

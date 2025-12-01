@@ -26,12 +26,11 @@ type Game struct {
 	// UI Sliders
 	sliderDetection *Slider
 	sliderDefense   *Slider
-	// Store World Dimensions
-	width  int
-	height int
+
+	cfg *Config
 }
 
-func GetNewGame(ctx context.Context, numRed, numBlue int, detectionRadius, defenseRadius, worldWidth, worldHeight float64) *Game {
+func GetNewGame(ctx context.Context, cfg *Config) *Game {
 	// 1. Start Actor System
 	system, _ := actor.NewActorSystem("SwarmWorld",
 		actor.WithLogger(golog.DefaultLogger),
@@ -43,16 +42,16 @@ func GetNewGame(ctx context.Context, numRed, numBlue int, detectionRadius, defen
 
 	// 3. SPAWN THE WORLD ACTOR
 	// Note: We pass the settings so the World can spawn the individuals
-	worldActor := NewWorldActor(snapshotCh, numRed, numBlue, detectionRadius, defenseRadius, worldWidth, worldHeight)
+	worldActor := NewWorldActor(snapshotCh, cfg)
 	worldPID, _ := system.Spawn(ctx, "World", worldActor)
 
 	// 4. Initialize Sliders (UI only)
 	sDet := &Slider{
-		Label: "Detection", Value: detectionRadius,
+		Label: "Detection", Value: cfg.DetectionRadius,
 		Min: 0, Max: 300, X: 10, Y: 20, W: 200, H: 20,
 	}
 	sDef := &Slider{
-		Label: "Defense", Value: defenseRadius,
+		Label: "Defense", Value: cfg.DefenseRadius,
 		Min: 0, Max: 100, X: 10, Y: 70, W: 200, H: 20,
 	}
 
@@ -64,8 +63,7 @@ func GetNewGame(ctx context.Context, numRed, numBlue int, detectionRadius, defen
 		lastState:       &WorldSnapshot{}, // Avoid nil pointer
 		sliderDetection: sDet,
 		sliderDefense:   sDef,
-		width:           int(worldWidth),
-		height:          int(worldHeight),
+		cfg:             cfg,
 	}
 }
 
@@ -128,4 +126,4 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	ebitenutil.DebugPrint(screen, msg)
 }
 
-func (g *Game) Layout(w, h int) (int, int) { return g.width, g.height }
+func (g *Game) Layout(w, h int) (int, int) { return int(g.cfg.WorldWidth), int(g.cfg.WorldHeight) }

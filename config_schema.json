@@ -1,0 +1,26 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "worldWidth": { "type": "number", "minimum": 100 },
+    "worldHeight": { "type": "number", "minimum": 100 },
+    "numRedAtStart": { "type": "integer", "minimum": 0 },
+    "numBlueAtStart": { "type": "integer", "minimum": 0 },
+    "detectionRadius": { "type": "number", "minimum": 0 },
+    "defenseRadius": { "type": "number", "minimum": 0 },
+    "contactRadius": { "type": "number", "minimum": 0 },
+    "maxSpeed": { "type": "number", "minimum": 0 },
+    "agression": { "type": "number", "minimum": 0, "maximum": 5 }
+  },
+  "required": [
+    "worldWidth",
+    "worldHeight",
+    "numRedAtStart",
+    "numBlueAtStart",
+    "detectionRadius",
+    "defenseRadius",
+    "contactRadius",
+    "maxSpeed",
+    "agression"
+  ]
+}

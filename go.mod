@@ -4,6 +4,7 @@ go 1.25.4
 
 require (
 	github.com/hajimehoshi/ebiten/v2 v2.9.4
+	github.com/santhosh-tekuri/jsonschema/v5 v5.3.1
 	github.com/tochemey/goakt/v3 v3.9.9
 	google.golang.org/protobuf v1.36.10
 )

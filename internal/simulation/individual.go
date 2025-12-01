@@ -20,22 +20,20 @@ type Individual struct {
 	X, Y           float64
 	vx, vy         float64
 	visibleTargets []*ActorState
-	worldWidth     float64
-	worldHeight    float64
+	cfg            *Config
 }
 
 var _ actor.Actor = (*Individual)(nil)
 
-func NewIndividual(color string, startX, startY, width, height float64) *Individual {
+func NewIndividual(color string, startX, startY float64, cfg *Config) *Individual {
 	return &Individual{
 		Color: color,
 		X:     startX,
 		Y:     startY,
 		// Initialize with random velocity
-		vx:          (rand.Float64() - 0.5) * 2,
-		vy:          (rand.Float64() - 0.5) * 2,
-		worldWidth:  width,
-		worldHeight: height,
+		vx:  (rand.Float64() - 0.5) * 2,
+		vy:  (rand.Float64() - 0.5) * 2,
+		cfg: cfg,
 	}
 }
 
@@ -130,16 +128,16 @@ func (i *Individual) updatePosition() {
 		i.X = 0
 		i.vx *= -1
 	}
-	if i.X > i.worldWidth {
-		i.X = i.worldWidth
+	if i.X > i.cfg.WorldWidth {
+		i.X = i.cfg.WorldWidth
 		i.vx *= -1
 	}
 	if i.Y < 0 {
 		i.Y = 0
 		i.vy *= -1
 	}
-	if i.Y > i.worldHeight {
-		i.Y = i.worldHeight
+	if i.Y > i.cfg.WorldHeight {
+		i.Y = i.cfg.WorldHeight
 		i.vy *= -1
 	}
 }
@@ -168,12 +166,12 @@ func (i *Individual) chaseClosestTarget() {
 			dy /= length
 		}
 
-		agression := 0.8 // Increased aggression for better catching
+		agression := i.cfg.Agression // Increased aggression for better catching
 		i.vx += dx * agression
 		i.vy += dy * agression
 
 		// Cap max speed
-		maxSpeed := 5.0
+		maxSpeed := i.cfg.MaxSpeed
 		speed := math.Sqrt(i.vx*i.vx + i.vy*i.vy)
 		if speed > maxSpeed {
 			i.vx = (i.vx / speed) * maxSpeed

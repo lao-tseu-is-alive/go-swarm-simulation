@@ -8,24 +8,20 @@ import (
 	"github.com/lao-tseu-is-alive/go-swarm-simulation/internal/simulation"
 )
 
-const (
-	numRedAtStart   = 10
-	numBlueAtStart  = 30
-	detectionRadius = 5
-	defenseRadius   = 40
-	worldWidth      = 1200
-	worldHeight     = 1000
-)
-
 func main() {
 	ctx := context.Background()
+	// Load Config
+	cfg, err := simulation.LoadConfig("config.json", "config_schema.json")
+	if err != nil {
+		log.Fatalf("Failed to load config: %v", err)
+	}
 
-	ebiten.SetWindowSize(worldWidth, worldHeight)
+	ebiten.SetWindowSize(int(cfg.WorldWidth), int(cfg.WorldHeight))
 	ebiten.SetWindowTitle("Swarm: Red vs Blue (Defense Mode)")
 
-	game := simulation.GetNewGame(ctx, numRedAtStart, numBlueAtStart, detectionRadius, defenseRadius, worldWidth, worldHeight)
+	game := simulation.GetNewGame(ctx, cfg)
 	defer game.System.Stop(ctx)
-	err := ebiten.RunGame(game)
+	err = ebiten.RunGame(game)
 	if err != nil {
 		log.Fatal(err)
 	}
