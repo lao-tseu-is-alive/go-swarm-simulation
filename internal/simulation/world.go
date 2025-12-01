@@ -8,14 +8,18 @@ import (
 	"github.com/tochemey/goakt/v3/goaktpb"
 )
 
+type gridKey struct {
+	x, y int
+}
+
 // WorldActor is the new "Brain." It manages the authoritative state and the spatial grid optimization.
 type WorldActor struct {
 	actors    map[string]*ActorState
 	pids      []*actor.PID // Keep track of children
 	uiChannel chan<- *WorldSnapshot
 	// Optimization: Spatial Hashing
-	// Map "gridX:gridY" -> list of actors in that cell
-	grid map[string][]*ActorState
+	// Map gridKey -> list of actors in that cell
+	grid map[gridKey][]*ActorState
 	// Communication with UI
 	snapshotCh chan<- *WorldSnapshot
 	// Game Settings (received from UI)
@@ -34,7 +38,7 @@ type WorldActor struct {
 func NewWorldActor(snapshotCh chan<- *WorldSnapshot, numRed, numBlue int, detR, defR, w, h float64) *WorldActor {
 	return &WorldActor{
 		actors:          make(map[string]*ActorState),
-		grid:            make(map[string][]*ActorState),
+		grid:            make(map[gridKey][]*ActorState),
 		snapshotCh:      snapshotCh,
 		numRed:          numRed,
 		numBlue:         numBlue,
@@ -121,12 +125,13 @@ func (w *WorldActor) spawnSwarm(ctx *actor.ReceiveContext) {
 }
 
 func (w *WorldActor) rebuildGrid() {
-	// Clear grid
-	w.grid = make(map[string][]*ActorState)
+	// Clear grid to reuse memory (Go 1.21+)
+	clear(w.grid)
 
 	cellSize := w.getCellSize()
 	for _, a := range w.actors {
-		key := fmt.Sprintf("%d:%d", int(a.PositionX/cellSize), int(a.PositionY/cellSize))
+		gx, gy := int(a.PositionX/cellSize), int(a.PositionY/cellSize)
+		key := gridKey{x: gx, y: gy}
 		w.grid[key] = append(w.grid[key], a)
 	}
 }
@@ -150,7 +155,7 @@ func (w *WorldActor) getNearbyActors(x, y float64) []*ActorState {
 	// Loop through X-1 to X+1 and Y-1 to Y+1
 	for i := gx - 1; i <= gx+1; i++ {
 		for j := gy - 1; j <= gy+1; j++ {
-			key := fmt.Sprintf("%d:%d", i, j)
+			key := gridKey{x: i, y: j}
 			if actors, ok := w.grid[key]; ok {
 				neighbors = append(neighbors, actors...)
 			}
