@@ -4,13 +4,8 @@ import (
 	"image/color"
 	"log"
 	"math"
-	"math/rand"
-	"time"
 
 	"github.com/hajimehoshi/ebiten/v2"
-	"github.com/hajimehoshi/ebiten/v2/vector"
-
-	// Import the local package
 	"github.com/lao-tseu-is-alive/go-swarm-simulation/pkg/behavior"
 )
 
@@ -53,31 +48,45 @@ func drawBoid(screen *ebiten.Image, b *behavior.Boid) {
 	leftX := b.X + math.Cos(angle-2.5)*5
 	leftY := b.Y + math.Sin(angle-2.5)*5
 
-	path := vector.Path{}
-	path.MoveTo(float32(tipX), float32(tipY))
-	path.LineTo(float32(rightX), float32(rightY))
-	path.LineTo(float32(leftX), float32(leftY))
-	path.Close()
+	// Define the 3 vertices of the triangle
+	vertices := []ebiten.Vertex{
+		{
+			DstX: float32(tipX),
+			DstY: float32(tipY),
+			SrcX: 1, SrcY: 1,
+			ColorR: 1, ColorG: 1, ColorB: 1, ColorA: 1,
+		},
+		{
+			DstX: float32(rightX),
+			DstY: float32(rightY),
+			SrcX: 1, SrcY: 1,
+			ColorR: 1, ColorG: 1, ColorB: 1, ColorA: 1,
+		},
+		{
+			DstX: float32(leftX),
+			DstY: float32(leftY),
+			SrcX: 1, SrcY: 1,
+			ColorR: 1, ColorG: 1, ColorB: 1, ColorA: 1,
+		},
+	}
 
-	vertices, indices := path.AppendVerticesAndIndicesForFilling(nil, nil)
+	indices := []uint16{0, 1, 2}
 
-	// Create a single color texture for the triangle
-	whiteSubImage := whiteImage.SubImage(whiteImage.Bounds()).(*ebiten.Image)
+	// Fix 1: Removed FillRule.
+	// For manual triangles, the default options are sufficient.
+	op := &ebiten.DrawTrianglesOptions{}
 
-	op := &ebiten.DrawTrianglesOptions{FillRule: ebiten.EvenOdd}
-	screen.DrawTriangles(vertices, indices, whiteSubImage, op)
+	screen.DrawTriangles(vertices, indices, whiteImage, op)
 }
 
 func (g *Game) Layout(w, h int) (int, int) {
 	return screenWidth, screenHeight
 }
 
-// Shared texture resource
 var whiteImage = ebiten.NewImage(3, 3)
 
 func init() {
 	whiteImage.Fill(color.RGBA{R: 100, G: 200, B: 255, A: 255})
-	rand.Seed(time.Now().UnixNano())
 }
 
 func main() {
@@ -107,7 +116,7 @@ func main() {
 	}
 
 	ebiten.SetWindowSize(screenWidth, screenHeight)
-	ebiten.SetWindowTitle("Refactored Boids")
+	ebiten.SetWindowTitle("Boids (Cleaned)")
 	if err := ebiten.RunGame(g); err != nil {
 		log.Fatal(err)
 	}
