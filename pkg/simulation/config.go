@@ -10,31 +10,47 @@ import (
 
 type Config struct {
 	// World Dimensions
-	WorldWidth  float64 `json:"worldWidth"`
+	// WorldWidth is the width of the simulation world in pixels.
+	WorldWidth float64 `json:"worldWidth"`
+	// WorldHeight is the height of the simulation world in pixels.
 	WorldHeight float64 `json:"worldHeight"`
 
 	// Population
-	NumRedAtStart  int `json:"numRedAtStart"`
+	// NumRedAtStart is the initial number of Red (Aggressive) actors.
+	NumRedAtStart int `json:"numRedAtStart"`
+	// NumBlueAtStart is the initial number of Blue (Flocking) actors.
 	NumBlueAtStart int `json:"numBlueAtStart"`
 
 	// Interaction Radii
+	// DetectionRadius is the radius within which Red actors can detect Blue actors.
 	DetectionRadius float64 `json:"detectionRadius"`
-	DefenseRadius   float64 `json:"defenseRadius"`
-	ContactRadius   float64 `json:"contactRadius"` // Previously hardcoded 12.0
+	// DefenseRadius is the radius within which Blue actors can defend each other.
+	DefenseRadius float64 `json:"defenseRadius"`
+	// ContactRadius is the radius for close-range interactions (e.g., combat/conversion).
+	ContactRadius float64 `json:"contactRadius"`
 
 	// Physics / Behavior
-	MaxSpeed   float64 `json:"maxSpeed"`   // Previously 5.0
-	Aggression float64 `json:"aggression"` // Previously 0.8
+	// MaxSpeed is the maximum speed an actor can travel per tick.
+	MaxSpeed float64 `json:"maxSpeed"`
+	// Aggression is a multiplier for the Red actors' chase force.
+	Aggression float64 `json:"aggression"`
 
 	// Boids flocking parameters (matching pkg/behavior/boid.go)
-	VisualRange    float64 `json:"visualRange"`    // How far can they see?
-	ProtectedRange float64 `json:"protectedRange"` // Personal space radius
+	// VisualRange is the radius within which Blue actors can see friends for Cohesion/Alignment.
+	VisualRange float64 `json:"visualRange"`
+	// ProtectedRange is the radius within which Blue actors try to avoid each other (Separation).
+	ProtectedRange float64 `json:"protectedRange"`
 
-	CenteringFactor float64 `json:"centeringFactor"` // Cohesion strength
-	AvoidFactor     float64 `json:"avoidFactor"`     // Separation strength
-	MatchingFactor  float64 `json:"matchingFactor"`  // Alignment strength
-	TurnFactor      float64 `json:"turnFactor"`      // Edge turning strength
+	// CenteringFactor controls the strength of Cohesion (moving towards the center of neighbors).
+	CenteringFactor float64 `json:"centeringFactor"`
+	// AvoidFactor controls the strength of Separation (avoiding crowding).
+	AvoidFactor float64 `json:"avoidFactor"`
+	// MatchingFactor controls the strength of Alignment (matching velocity with neighbors).
+	MatchingFactor float64 `json:"matchingFactor"`
+	// TurnFactor controls how strongly actors turn away from the screen edges.
+	TurnFactor float64 `json:"turnFactor"`
 
+	// MinSpeed is the minimum speed a Blue actor tries to maintain.
 	MinSpeed float64 `json:"minSpeed"`
 }
 

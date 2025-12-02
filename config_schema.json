@@ -4,69 +4,85 @@
   "properties": {
     "worldWidth": {
       "type": "number",
-      "minimum": 100
+      "minimum": 100,
+      "description": "Width of the simulation world in pixels."
     },
     "worldHeight": {
       "type": "number",
-      "minimum": 100
+      "minimum": 100,
+      "description": "Height of the simulation world in pixels."
     },
     "numRedAtStart": {
       "type": "integer",
-      "minimum": 0
+      "minimum": 0,
+      "description": "Initial number of Red (Aggressive) actors."
     },
     "numBlueAtStart": {
       "type": "integer",
-      "minimum": 0
+      "minimum": 0,
+      "description": "Initial number of Blue (Flocking) actors."
     },
     "detectionRadius": {
       "type": "number",
-      "minimum": 0
+      "minimum": 0,
+      "description": "Radius within which Red actors can detect Blue actors."
     },
     "defenseRadius": {
       "type": "number",
-      "minimum": 0
+      "minimum": 0,
+      "description": "Radius within which Blue actors can defend each other."
     },
     "contactRadius": {
       "type": "number",
-      "minimum": 0
+      "minimum": 0,
+      "description": "Radius for close-range interactions (e.g., combat/conversion)."
     },
     "maxSpeed": {
       "type": "number",
       "minimum": 1.0,
-      "maximum": 10
+      "maximum": 10,
+      "description": "Maximum speed an actor can travel per tick."
     },
     "aggression": {
       "type": "number",
       "minimum": 0,
-      "maximum": 5
+      "maximum": 5,
+      "description": "Multiplier for the Red actors' chase force."
     },
     "visualRange": {
       "type": "number",
-      "minimum": 0
+      "minimum": 0,
+      "description": "Radius within which Blue actors can see friends for Cohesion/Alignment."
     },
     "protectedRange": {
       "type": "number",
-      "minimum": 0
+      "minimum": 0,
+      "description": "Radius within which Blue actors try to avoid each other (Separation)."
     },
     "centeringFactor": {
       "type": "number",
-      "minimum": 0
+      "minimum": 0,
+      "description": "Strength of Cohesion (moving towards the center of neighbors)."
     },
     "avoidFactor": {
       "type": "number",
-      "minimum": 0
+      "minimum": 0,
+      "description": "Strength of Separation (avoiding crowding)."
     },
     "matchingFactor": {
       "type": "number",
-      "minimum": 0
+      "minimum": 0,
+      "description": "Strength of Alignment (matching velocity with neighbors)."
     },
     "turnFactor": {
       "type": "number",
-      "minimum": 0
+      "minimum": 0,
+      "description": "Strength of turning away from screen edges."
     },
     "minSpeed": {
       "type": "number",
-      "minimum": 0
+      "minimum": 0,
+      "description": "Minimum speed a Blue actor tries to maintain."
     }
   },
   "required": [
