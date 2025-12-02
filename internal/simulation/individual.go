@@ -118,8 +118,8 @@ func (i *Individual) BlueBehavior(ctx *actor.ReceiveContext) {
 	case *Tick:
 		// Blue: Consensual/Swarm behavior (Cohesion could be added here)
 		// For now, they stabilize and drift
-		i.vx += 0.006
-		i.vy += 0.005
+		i.vx += 0.016
+		i.vy += 0.025
 		// === FLOCKING LOGIC ===
 		// 1. Calculate Acceleration based on neighbors
 		ax := 0.0
@@ -181,6 +181,7 @@ func (i *Individual) BlueBehavior(ctx *actor.ReceiveContext) {
 
 func (i *Individual) reportState(ctx *actor.ReceiveContext) {
 	// Prepare state to send back to World
+	i.Log(ctx.ActorSystem(), "%s (%6f,%6f) -> [%6d,%6d]", i.ID, i.X, i.Y, i.vx, i.vy)
 	state := &ActorState{
 		Id:        ctx.Self().Name(),
 		Color:     i.Color,
