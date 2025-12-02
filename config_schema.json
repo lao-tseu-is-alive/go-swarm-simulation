@@ -2,18 +2,72 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "type": "object",
   "properties": {
-    "worldWidth": { "type": "number", "minimum": 100 },
-    "worldHeight": { "type": "number", "minimum": 100 },
-    "numRedAtStart": { "type": "integer", "minimum": 0 },
-    "numBlueAtStart": { "type": "integer", "minimum": 0 },
-    "detectionRadius": { "type": "number", "minimum": 0 },
-    "defenseRadius": { "type": "number", "minimum": 0 },
-    "contactRadius": { "type": "number", "minimum": 0 },
-    "maxSpeed": { "type": "number", "minimum": 1.0, "maximum": 5 },
-    "aggression": { "type": "number", "minimum": 0, "maximum": 5 },
-    "cohesionWeight": { "type": "number", "minimum": 0 },
-    "alignmentWeight": { "type": "number", "minimum": 0 },
-    "separationWeight": { "type": "number", "minimum": 0 }
+    "worldWidth": {
+      "type": "number",
+      "minimum": 100
+    },
+    "worldHeight": {
+      "type": "number",
+      "minimum": 100
+    },
+    "numRedAtStart": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "numBlueAtStart": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "detectionRadius": {
+      "type": "number",
+      "minimum": 0
+    },
+    "defenseRadius": {
+      "type": "number",
+      "minimum": 0
+    },
+    "contactRadius": {
+      "type": "number",
+      "minimum": 0
+    },
+    "maxSpeed": {
+      "type": "number",
+      "minimum": 1.0,
+      "maximum": 10
+    },
+    "aggression": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 5
+    },
+    "visualRange": {
+      "type": "number",
+      "minimum": 0
+    },
+    "protectedRange": {
+      "type": "number",
+      "minimum": 0
+    },
+    "centeringFactor": {
+      "type": "number",
+      "minimum": 0
+    },
+    "avoidFactor": {
+      "type": "number",
+      "minimum": 0
+    },
+    "matchingFactor": {
+      "type": "number",
+      "minimum": 0
+    },
+    "turnFactor": {
+      "type": "number",
+      "minimum": 0
+    },
+    "minSpeed": {
+      "type": "number",
+      "minimum": 0
+    }
   },
   "required": [
     "worldWidth",
@@ -24,6 +78,13 @@
     "defenseRadius",
     "contactRadius",
     "maxSpeed",
-    "aggression"
+    "aggression",
+    "visualRange",
+    "protectedRange",
+    "centeringFactor",
+    "avoidFactor",
+    "matchingFactor",
+    "turnFactor",
+    "minSpeed"
   ]
 }

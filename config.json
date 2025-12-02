@@ -8,9 +8,11 @@
   "contactRadius": 12,
   "maxSpeed": 4.0,
   "aggression": 0.8,
-  "cohesionWeight": 0.3,
-  "alignmentWeight": 0.4,
-  "separationWeight": 1.0,
-  "perceptionRadius": 50.0,
-  "separationRadius": 20.0
+  "visualRange": 70.0,
+  "protectedRange": 20.0,
+  "centeringFactor": 0.0005,
+  "avoidFactor": 0.05,
+  "matchingFactor": 0.05,
+  "turnFactor": 0.2,
+  "minSpeed": 2.0
 }

@@ -26,12 +26,16 @@ type Config struct {
 	MaxSpeed   float64 `json:"maxSpeed"`   // Previously 5.0
 	Aggression float64 `json:"aggression"` // Previously 0.8
 
-	//Boids flocking parameters
-	CohesionWeight   float64 `json:"cohesionWeight"`
-	AlignmentWeight  float64 `json:"alignmentWeight"`
-	SeparationWeight float64 `json:"separationWeight"`
-	PerceptionRadius float64 `json:"perceptionRadius"` // For flocking neighbor detection
-	SeparationRadius float64 `json:"separationRadius"` // Distance at which separation kicks in
+	// Boids flocking parameters (matching pkg/behavior/boid.go)
+	VisualRange    float64 `json:"visualRange"`    // How far can they see?
+	ProtectedRange float64 `json:"protectedRange"` // Personal space radius
+
+	CenteringFactor float64 `json:"centeringFactor"` // Cohesion strength
+	AvoidFactor     float64 `json:"avoidFactor"`     // Separation strength
+	MatchingFactor  float64 `json:"matchingFactor"`  // Alignment strength
+	TurnFactor      float64 `json:"turnFactor"`      // Edge turning strength
+
+	MinSpeed float64 `json:"minSpeed"`
 }
 
 func DefaultConfig() *Config {
@@ -43,14 +47,15 @@ func DefaultConfig() *Config {
 		DetectionRadius: 50,
 		DefenseRadius:   40,
 		ContactRadius:   12,
+		VisualRange:     70.0,
+		ProtectedRange:  20.0,
+		CenteringFactor: 0.0005,
+		AvoidFactor:     0.05,
+		MatchingFactor:  0.05,
+		TurnFactor:      0.2,
 		MaxSpeed:        4.0,
+		MinSpeed:        2.0,
 		Aggression:      0.8,
-		// Reynolds' steering works by calculating a SteeringForce = DesiredVelocity - CurrentVelocity
-		CohesionWeight:   0.5,
-		AlignmentWeight:  0.5,
-		SeparationWeight: 0.8, // Separation usually needs to be higher to prevent overlapping
-		PerceptionRadius: 60.0,
-		SeparationRadius: 20.0, // Closer than perception for avoiding collisions
 	}
 }
 

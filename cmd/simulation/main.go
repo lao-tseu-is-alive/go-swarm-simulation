@@ -5,7 +5,7 @@ import (
 	"log"
 
 	"github.com/hajimehoshi/ebiten/v2"
-	"github.com/lao-tseu-is-alive/go-swarm-simulation/internal/simulation"
+	"github.com/lao-tseu-is-alive/go-swarm-simulation/pkg/simulation"
 )
 
 func main() {

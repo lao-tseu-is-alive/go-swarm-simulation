@@ -24,9 +24,9 @@ type WorldActor struct {
 	// Communication with UI
 	snapshotCh chan<- *WorldSnapshot
 	// Game Settings (received from UI)
-	detectionRadius  float64
-	perceptionRadius float64 // For friends (Blue seeking Blue)
-	defenseRadius    float64
+	detectionRadius float64
+	visualRange     float64 // For friends (Blue seeking Blue)
+	defenseRadius   float64
 
 	cfg *Config
 }
@@ -34,14 +34,14 @@ type WorldActor struct {
 // NewWorldActor creates the world logic unit
 func NewWorldActor(snapshotCh chan<- *WorldSnapshot, cfg *Config) *WorldActor {
 	return &WorldActor{
-		actors:           make(map[string]*ActorState),
-		pidsCache:        make(map[string]*actor.PID),
-		grid:             make(map[gridKey][]*ActorState),
-		snapshotCh:       snapshotCh,
-		cfg:              cfg,
-		detectionRadius:  cfg.DetectionRadius,
-		defenseRadius:    cfg.DefenseRadius,
-		perceptionRadius: cfg.PerceptionRadius,
+		actors:          make(map[string]*ActorState),
+		pidsCache:       make(map[string]*actor.PID),
+		grid:            make(map[gridKey][]*ActorState),
+		snapshotCh:      snapshotCh,
+		cfg:             cfg,
+		detectionRadius: cfg.DetectionRadius,
+		defenseRadius:   cfg.DefenseRadius,
+		visualRange:     cfg.VisualRange,
 	}
 }
 
@@ -184,7 +184,7 @@ func (w *WorldActor) rebuildGrid() {
 func (w *WorldActor) getCellSize() float64 {
 	// Use the largest radius to ensure our 3x3 grid check covers everything
 	maxRadius := math.Max(w.detectionRadius, w.defenseRadius)
-	maxRadius = math.Max(maxRadius, w.perceptionRadius)
+	maxRadius = math.Max(maxRadius, w.visualRange)
 	// Clamp to a minimum of 10 to avoid tiny grids or div by zero
 	return math.Max(maxRadius, 10.0)
 }
@@ -213,7 +213,7 @@ func (w *WorldActor) getNearbyActors(x, y float64) []*ActorState {
 func (w *WorldActor) processInteractions(ctx *actor.ReceiveContext) {
 	// Pre-calculate squared radii for performance
 	detectionSq := w.detectionRadius * w.detectionRadius
-	perceptionSq := w.perceptionRadius * w.perceptionRadius
+	perceptionSq := w.visualRange * w.visualRange
 	contactSq := w.cfg.ContactRadius * w.cfg.ContactRadius
 	defSq := w.defenseRadius * w.defenseRadius
 

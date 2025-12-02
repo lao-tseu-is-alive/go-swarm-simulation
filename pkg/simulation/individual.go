@@ -80,7 +80,7 @@ func (i *Individual) RedBehavior(ctx *actor.ReceiveContext) {
 			i.vx += (rand.Float64() - 0.5) * 0.15
 			i.vy += (rand.Float64() - 0.5) * 0.15
 		}
-		i.updatePosition()
+		i.updateBouncePosition()
 		i.reportState(ctx)
 
 	case *Perception:
@@ -118,42 +118,14 @@ func (i *Individual) BlueBehavior(ctx *actor.ReceiveContext) {
 	case *Tick:
 		// Blue: Flocking behavior (Cohesion, Alignment, Separation)
 		// === FLOCKING LOGIC ===
-		// 1. Calculate Acceleration based on neighbors
-		ax := 0.0
-		ay := 0.0
-		ax, ay = ComputeFlockingForce(i, i.visibleFriends, i.cfg)
+		// 1. Calculate Velocity based on neighbors
+		vx, vy := ComputeBoidUpdate(i, i.visibleFriends, i.cfg)
+		i.vx = vx
+		i.vy = vy
 
-		// 2. Add randomness if alone to prevent freezing
-		if len(i.visibleFriends) == 0 {
-			ax += (rand.Float64() - 0.5) * 0.5
-			ay += (rand.Float64() - 0.5) * 0.5
-		}
+		// 2. Update Position (Soft Turn + Move)
+		i.updateSoftTurnPosition()
 
-		// 3. Apply Acceleration
-		i.vx += ax
-		i.vy += ay
-		// --- PROPULSION ENGINE ---
-		// Ensure the boid always maintains a minimum cruising speed.
-		// Reduced to 20% to allow natural slow-down during cohesion.
-		minSpeed := i.cfg.MaxSpeed * 0.2
-		speed := math.Sqrt(i.vx*i.vx + i.vy*i.vy)
-
-		if speed < minSpeed {
-			if speed < 0.001 {
-				// If strictly zero, give a random nudge to restart
-				i.vx = rand.Float64() - 0.5
-				i.vy = rand.Float64() - 0.5
-				speed = math.Sqrt(i.vx*i.vx + i.vy*i.vy)
-			}
-			// Boost speed back to minimum
-			scale := minSpeed / speed
-			i.vx *= scale
-			i.vy *= scale
-		}
-		// ----------------------------------------
-
-		i.updatePosition()
-		//i.applyFlocking() // No "if blue" needed!
 		i.reportState(ctx)
 
 	case *Perception:
@@ -178,12 +150,14 @@ func (i *Individual) BlueBehavior(ctx *actor.ReceiveContext) {
 
 func (i *Individual) reportState(ctx *actor.ReceiveContext) {
 	// Prepare state to send back to World
-	i.Log(ctx.ActorSystem(), "%s (%6f,%6f) -> [%6d,%6d]", i.ID, i.X, i.Y, i.vx, i.vy)
+	// i.Log(ctx.ActorSystem(), "%s (%6f,%6f) -> [%6d,%6d]", i.ID, i.X, i.Y, i.vx, i.vy)
 	state := &ActorState{
 		Id:        ctx.Self().Name(),
 		Color:     i.Color,
 		PositionX: i.X,
 		PositionY: i.Y,
+		VelocityX: i.vx,
+		VelocityY: i.vy,
 	}
 
 	// REPORT TO WORLD
@@ -206,7 +180,8 @@ func (i *Individual) makeState() *ActorState {
 		VelocityY: i.vy,
 	}
 }
-func (i *Individual) updatePosition() {
+
+func (i *Individual) updateBouncePosition() {
 	// 2. Physics Integration
 	i.X += i.vx
 	i.Y += i.vy
@@ -235,7 +210,37 @@ func (i *Individual) updatePosition() {
 	if i.vy == 0 {
 		i.vy = 0.01
 	}
+}
 
+func (i *Individual) updateSoftTurnPosition() {
+	// Screen Edges (Soft turn)
+	margin := 100.0
+	if i.X < margin {
+		i.vx += i.cfg.TurnFactor
+	}
+	if i.X > i.cfg.WorldWidth-margin {
+		i.vx -= i.cfg.TurnFactor
+	}
+	if i.Y < margin {
+		i.vy += i.cfg.TurnFactor
+	}
+	if i.Y > i.cfg.WorldHeight-margin {
+		i.vy -= i.cfg.TurnFactor
+	}
+
+	// Speed Limits
+	speed := math.Sqrt(i.vx*i.vx + i.vy*i.vy)
+	if speed > i.cfg.MaxSpeed {
+		i.vx = (i.vx / speed) * i.cfg.MaxSpeed
+		i.vy = (i.vy / speed) * i.cfg.MaxSpeed
+	} else if speed < i.cfg.MinSpeed {
+		i.vx = (i.vx / speed) * i.cfg.MinSpeed
+		i.vy = (i.vy / speed) * i.cfg.MinSpeed
+	}
+
+	// Move
+	i.X += i.vx
+	i.Y += i.vy
 }
 
 func (i *Individual) chaseClosestTarget() {
