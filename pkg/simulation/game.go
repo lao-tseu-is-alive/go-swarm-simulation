@@ -48,11 +48,11 @@ func GetNewGame(ctx context.Context, cfg *Config) *Game {
 	worldPID, _ := system.Spawn(ctx, "World", worldActor)
 
 	// 4. Initialize Sliders (UI only)
-	sDet := &Slider{
+	sDetection := &Slider{
 		Label: "Detection", Value: cfg.DetectionRadius,
 		Min: 0, Max: 100, X: 10, Y: 20, W: 200, H: 20,
 	}
-	sDef := &Slider{
+	sDefense := &Slider{
 		Label: "Defense", Value: cfg.DefenseRadius,
 		Min: 0, Max: 100, X: 10, Y: 70, W: 200, H: 20,
 	}
@@ -72,8 +72,8 @@ func GetNewGame(ctx context.Context, cfg *Config) *Game {
 			unknownFields: nil,
 			sizeCache:     0,
 		}, // Avoid nil pointer
-		sliderDetection: sDet,
-		sliderDefense:   sDef,
+		sliderDetection: sDetection,
+		sliderDefense:   sDefense,
 		cfg:             cfg,
 	}
 }
@@ -120,7 +120,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 					screen,
 					float32(entity.PositionX),
 					float32(entity.PositionY),
-					float32(g.cfg.DetectionRadius),
+					float32(g.sliderDetection.Value),
 					1,
 					clr,
 					true,
@@ -143,7 +143,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 					screen,
 					float32(entity.PositionX),
 					float32(entity.PositionY),
-					float32(g.cfg.DefenseRadius),
+					float32(g.sliderDefense.Value),
 					1,
 					clr,
 					true,

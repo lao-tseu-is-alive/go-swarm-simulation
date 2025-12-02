@@ -1,8 +1,8 @@
 {
   "worldWidth": 1000,
   "worldHeight": 800,
-  "numRedAtStart": 5,
-  "numBlueAtStart": 25,
+  "numRedAtStart": 1,
+  "numBlueAtStart": 5,
   "detectionRadius": 80,
   "defenseRadius": 50,
   "contactRadius": 12,
