@@ -41,7 +41,8 @@ func (i *Individual) PreStart(ctx *actor.Context) error {
 	// ctx.ActorName() might be deprecated in v3 favor of ctx.Name()
 	// but let's assume ctx.ActorName() or ctx.Name() works.
 	// If Error: use ctx.Self().Name() in Receive
-	ctx.ActorSystem().Logger().Infof("Born: %s (%s) at %.2f, %.2f", ctx.ActorName(), i.Color, i.X, i.Y)
+	i.ID = ctx.ActorName()
+	i.Log(ctx.ActorSystem(), "Born: %s (%s) at %.2f, %.2f", i.ID, i.Color, i.X, i.Y)
 	return nil
 }
 
@@ -58,7 +59,7 @@ func (i *Individual) Receive(ctx *actor.ReceiveContext) {
 }
 
 func (i *Individual) PostStop(ctx *actor.Context) error {
-	ctx.ActorSystem().Logger().Infof("Death : %s", ctx.ActorName())
+	i.Log(ctx.ActorSystem(), "Death : %s", ctx.ActorName())
 	return nil
 }
 
@@ -66,7 +67,7 @@ func (i *Individual) PostStop(ctx *actor.Context) error {
 func (i *Individual) RedBehavior(ctx *actor.ReceiveContext) {
 	switch msg := ctx.Message().(type) {
 	case *goaktpb.PostStart:
-		ctx.Logger().Infof("%s started", ctx.Self().Name())
+		i.Log(ctx.ActorSystem(), "%s started", ctx.Self().Name())
 		// Initialize ID here
 		i.ID = ctx.Self().Name()
 
@@ -89,7 +90,7 @@ func (i *Individual) RedBehavior(ctx *actor.ReceiveContext) {
 	// Handle Conversion
 	case *Convert:
 		if msg.TargetColor == ColorBlue {
-			ctx.Logger().Infof("%s converting from %s to %s", ctx.Self().Name(), i.Color, msg.TargetColor)
+			i.Log(ctx.ActorSystem(), "%s converting from %s to %s", ctx.Self().Name(), i.Color, msg.TargetColor)
 			i.Color = ColorBlue
 			ctx.Become(i.BlueBehavior) // <--- The Magic thank's to Actor behaviors
 			i.visibleTargets = nil     // Clear memory of old enemies
@@ -111,7 +112,7 @@ func (i *Individual) RedBehavior(ctx *actor.ReceiveContext) {
 func (i *Individual) BlueBehavior(ctx *actor.ReceiveContext) {
 	switch msg := ctx.Message().(type) {
 	case *goaktpb.PostStart:
-		ctx.Logger().Infof("%s started", ctx.Self().Name())
+		i.Log(ctx.ActorSystem(), "%s started", ctx.Self().Name())
 		// Initialize ID here
 		i.ID = ctx.Self().Name()
 	case *Tick:
@@ -164,7 +165,7 @@ func (i *Individual) BlueBehavior(ctx *actor.ReceiveContext) {
 
 	case *Convert:
 		if msg.TargetColor == ColorRed {
-			ctx.Logger().Infof("%s converting from %s to %s", ctx.Self().Name(), i.Color, msg.TargetColor)
+			i.Log(ctx.ActorSystem(), "%s converting from %s to %s", ctx.Self().Name(), i.Color, msg.TargetColor)
 			i.Color = ColorRed
 			ctx.Become(i.RedBehavior) // <--- The Magic thank's to Actor behaviors
 			i.visibleTargets = nil    // Clear memory of old enemies
@@ -275,4 +276,9 @@ func (i *Individual) chaseClosestTarget() {
 			i.vy = (i.vy / speed) * maxSpeed
 		}
 	}
+}
+
+// Log is a helper to log messages with the actor's ID
+func (i *Individual) Log(sys actor.ActorSystem, format string, args ...interface{}) {
+	sys.Logger().Infof("[%s] "+format, append([]interface{}{i.ID}, args...)...)
 }

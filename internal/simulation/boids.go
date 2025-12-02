@@ -71,12 +71,11 @@ func ComputeFlockingForce(me *Individual, friends []*ActorState, cfg *Config) (f
 	if sepSpeed > 0 {
 		sepX = (sepX / sepSpeed) * cfg.MaxSpeed
 		sepY = (sepY / sepSpeed) * cfg.MaxSpeed
+
+		// Reynolds Separation is usually: Steering = Desired(Away) - Velocity
+		sepX -= me.vx
+		sepY -= me.vy
 	}
-	// Reynolds Separation is usually: Steering = Desired(Away) - Velocity
-	// But often just adding the raw "Away" vector works better for stabilization.
-	// Let's stick to Steering:
-	sepX -= me.vx
-	sepY -= me.vy
 
 	// Apply Weights
 	totalX := (cohX * cfg.CohesionWeight) + (alignX * cfg.AlignmentWeight) + (sepX * cfg.SeparationWeight)
