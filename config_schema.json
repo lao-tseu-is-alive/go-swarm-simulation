@@ -9,7 +9,7 @@
     "detectionRadius": { "type": "number", "minimum": 0 },
     "defenseRadius": { "type": "number", "minimum": 0 },
     "contactRadius": { "type": "number", "minimum": 0 },
-    "maxSpeed": { "type": "number", "minimum": 0 },
+    "maxSpeed": { "type": "number", "minimum": 1.0, "maximum": 5 },
     "aggression": { "type": "number", "minimum": 0, "maximum": 5 },
     "cohesionWeight": { "type": "number", "minimum": 0 },
     "alignmentWeight": { "type": "number", "minimum": 0 },

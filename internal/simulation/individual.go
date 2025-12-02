@@ -26,15 +26,14 @@ type Individual struct {
 
 var _ actor.Actor = (*Individual)(nil)
 
-func NewIndividual(color string, startX, startY float64, cfg *Config) *Individual {
+func NewIndividual(color string, startX, startY, vx, vy float64, cfg *Config) *Individual {
 	return &Individual{
 		Color: color,
 		X:     startX,
 		Y:     startY,
-		// Initialize with random velocity
-		vx:  (rand.Float64() - 0.5) * 2,
-		vy:  (rand.Float64() - 0.5) * 2,
-		cfg: cfg,
+		vx:    vx + (rand.Float64()-0.5)*2,
+		vy:    vy + (rand.Float64()-0.5)*2,
+		cfg:   cfg,
 	}
 }
 
@@ -118,8 +117,8 @@ func (i *Individual) BlueBehavior(ctx *actor.ReceiveContext) {
 	case *Tick:
 		// Blue: Consensual/Swarm behavior (Cohesion could be added here)
 		// For now, they stabilize and drift
-		i.vx += 0.05
-		i.vy += 0.05
+		i.vx += 0.006
+		i.vy += 0.005
 		// === FLOCKING LOGIC ===
 		// 1. Calculate Acceleration based on neighbors
 		ax := 0.0
@@ -135,6 +134,26 @@ func (i *Individual) BlueBehavior(ctx *actor.ReceiveContext) {
 		// 3. Apply Acceleration
 		i.vx += ax
 		i.vy += ay
+		// --- NEW: PROPULSION ENGINE (The Fix) ---
+		// Ensure the boid always maintains a minimum cruising speed.
+		// Without this, they settle into a grid and stop.
+		minSpeed := i.cfg.MaxSpeed * 0.5
+		speed := math.Sqrt(i.vx*i.vx + i.vy*i.vy)
+
+		if speed < minSpeed {
+			if speed < 0.001 {
+				// If strictly zero, give a random nudge to restart
+				i.vx = rand.Float64() - 0.5
+				i.vy = rand.Float64() - 0.5
+				speed = math.Sqrt(i.vx*i.vx + i.vy*i.vy)
+			}
+			// Boost speed back to minimum
+			scale := minSpeed / speed
+			i.vx *= scale
+			i.vy *= scale
+		}
+		// ----------------------------------------
+
 		i.updatePosition()
 		//i.applyFlocking() // No "if blue" needed!
 		i.reportState(ctx)

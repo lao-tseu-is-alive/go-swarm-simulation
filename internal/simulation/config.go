@@ -35,18 +35,19 @@ type Config struct {
 
 func DefaultConfig() *Config {
 	return &Config{
-		WorldWidth:       1000,
-		WorldHeight:      800,
-		NumRedAtStart:    5,
-		NumBlueAtStart:   30,
-		DetectionRadius:  50,
-		DefenseRadius:    40,
-		ContactRadius:    12,
-		MaxSpeed:         5.0,
-		Aggression:       0.8,
-		CohesionWeight:   1.0,
-		AlignmentWeight:  1.0,
-		SeparationWeight: 1.5, // Separation usually needs to be higher to prevent overlapping
+		WorldWidth:      1000,
+		WorldHeight:     800,
+		NumRedAtStart:   5,
+		NumBlueAtStart:  30,
+		DetectionRadius: 50,
+		DefenseRadius:   40,
+		ContactRadius:   12,
+		MaxSpeed:        4.0,
+		Aggression:      0.8,
+		// Reynolds' steering works by calculating a SteeringForce = DesiredVelocity - CurrentVelocity
+		CohesionWeight:   0.5,
+		AlignmentWeight:  0.5,
+		SeparationWeight: 0.8, // Separation usually needs to be higher to prevent overlapping
 		PerceptionRadius: 60.0,
 	}
 }

@@ -2,7 +2,6 @@ package simulation
 
 import (
 	"math"
-	"math/rand"
 )
 
 // ComputeFlockingForce calculates the acceleration vector safely
@@ -30,19 +29,22 @@ func ComputeFlockingForce(me *Individual, friends []*ActorState, cfg *Config) (f
 		dy := me.Y - n.PositionY
 		distSq := dx*dx + dy*dy
 
-		// --- SAFETY CHECK: Prevent Singularity ---
-		// If actors are too close (overlapping), apply a random "emergency push"
-		// to separate them. Do NOT divide by small numbers.
-		if distSq < 1.0 {
-			// Random push direction to break the symmetry/overlap
-			sepX += (rand.Float64() - 0.5) * 50.0
-			sepY += (rand.Float64() - 0.5) * 50.0
-			continue
+		// Inside the loop in ComputeFlockingForce
+		dist := math.Sqrt(distSq)
+
+		// Calculate how much we are overlapping (0.0 to 1.0)
+		// The closer we are, the stronger the push.
+		// Using PerceptionRadius as the threshold, or a specific SeparationRadius (better).
+		if dist < cfg.PerceptionRadius {
+			// Weight the push by how close they are
+			strength := (cfg.PerceptionRadius - dist) / cfg.PerceptionRadius
+
+			// Normalize direction (dx/dist) and scale by strength.
+			// dx already points AWAY (Me - Neighbor), so we ADD it to separate.
+			sepX += (dx / dist) * strength
+			sepY += (dy / dist) * strength
 		}
 
-		// Standard Inverse Square Law
-		sepX += dx / distSq
-		sepY += dy / distSq
 	}
 
 	// 1. Cohesion

@@ -137,7 +137,7 @@ func (w *WorldActor) spawnSwarm(ctx *actor.ReceiveContext) {
 	for i := 0; i < w.cfg.NumRedAtStart; i++ {
 		name := fmt.Sprintf("Red-%03d", i)
 		// Spawn using ReceiveContext.Spawn (creates a child)
-		pid := ctx.Spawn(name, NewIndividual(ColorRed, 50+float64(i)*20, 150, w.cfg))
+		pid := ctx.Spawn(name, NewIndividual(ColorRed, 50+float64(i)*20, 150, 0.2, 0.2, w.cfg))
 		w.pids = append(w.pids, pid)
 		w.pidsCache[name] = pid
 	}
@@ -157,7 +157,7 @@ func (w *WorldActor) spawnSwarm(ctx *actor.ReceiveContext) {
 			startX = 50 + float64(i)*5
 		}
 
-		pid := ctx.Spawn(name, NewIndividual(ColorBlue, startX, startY, w.cfg))
+		pid := ctx.Spawn(name, NewIndividual(ColorBlue, startX, startY, 0.2, 0.2, w.cfg))
 		w.pids = append(w.pids, pid)
 		w.pidsCache[name] = pid
 	}
@@ -184,6 +184,7 @@ func (w *WorldActor) rebuildGrid() {
 func (w *WorldActor) getCellSize() float64 {
 	// Use the largest radius to ensure our 3x3 grid check covers everything
 	maxRadius := math.Max(w.detectionRadius, w.defenseRadius)
+	maxRadius = math.Max(maxRadius, w.perceptionRadius)
 	// Clamp to a minimum of 10 to avoid tiny grids or div by zero
 	return math.Max(maxRadius, 10.0)
 }
@@ -214,7 +215,7 @@ func (w *WorldActor) processInteractions(ctx *actor.ReceiveContext) {
 	detectionSq := w.detectionRadius * w.detectionRadius
 	perceptionSq := w.perceptionRadius * w.perceptionRadius
 	contactSq := w.cfg.ContactRadius * w.cfg.ContactRadius
-	defSq := w.defenseRadius * w.defenseRadius // <--- Declared here
+	defSq := w.defenseRadius * w.defenseRadius
 
 	// Iterate over every actor to calculate what they see and handle interactions
 	for _, actorRef := range w.actors {

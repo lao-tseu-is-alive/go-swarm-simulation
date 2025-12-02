@@ -114,8 +114,26 @@ func (g *Game) Draw(screen *ebiten.Image) {
 			var clr color.Color
 			if entity.Color == ColorRed {
 				clr = color.RGBA{R: 255, G: 50, B: 50, A: 255}
+				vector.StrokeCircle(
+					screen,
+					float32(entity.PositionX),
+					float32(entity.PositionY),
+					float32(g.cfg.DetectionRadius),
+					1,
+					clr,
+					true,
+				)
 			} else {
 				clr = color.RGBA{R: 50, G: 100, B: 255, A: 255}
+				vector.StrokeCircle(
+					screen,
+					float32(entity.PositionX),
+					float32(entity.PositionY),
+					float32(g.cfg.DefenseRadius),
+					1,
+					clr,
+					true,
+				)
 			}
 
 			vector.FillCircle(
