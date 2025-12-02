@@ -34,10 +34,10 @@ func ComputeFlockingForce(me *Individual, friends []*ActorState, cfg *Config) (f
 
 		// Calculate how much we are overlapping (0.0 to 1.0)
 		// The closer we are, the stronger the push.
-		// Using PerceptionRadius as the threshold, or a specific SeparationRadius (better).
-		if dist < cfg.PerceptionRadius {
+		// Using dedicated SeparationRadius for more precise control
+		if dist > 0.001 && dist < cfg.SeparationRadius {
 			// Weight the push by how close they are
-			strength := (cfg.PerceptionRadius - dist) / cfg.PerceptionRadius
+			strength := (cfg.SeparationRadius - dist) / cfg.SeparationRadius
 
 			// Normalize direction (dx/dist) and scale by strength.
 			// dx already points AWAY (Me - Neighbor), so we ADD it to separate.

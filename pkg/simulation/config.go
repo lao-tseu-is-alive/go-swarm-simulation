@@ -30,7 +30,8 @@ type Config struct {
 	CohesionWeight   float64 `json:"cohesionWeight"`
 	AlignmentWeight  float64 `json:"alignmentWeight"`
 	SeparationWeight float64 `json:"separationWeight"`
-	PerceptionRadius float64 `json:"perceptionRadius"` // Often larger than contact radius
+	PerceptionRadius float64 `json:"perceptionRadius"` // For flocking neighbor detection
+	SeparationRadius float64 `json:"separationRadius"` // Distance at which separation kicks in
 }
 
 func DefaultConfig() *Config {
@@ -49,6 +50,7 @@ func DefaultConfig() *Config {
 		AlignmentWeight:  0.5,
 		SeparationWeight: 0.8, // Separation usually needs to be higher to prevent overlapping
 		PerceptionRadius: 60.0,
+		SeparationRadius: 20.0, // Closer than perception for avoiding collisions
 	}
 }
 

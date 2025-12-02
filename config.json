@@ -3,13 +3,14 @@
   "worldHeight": 800,
   "numRedAtStart": 5,
   "numBlueAtStart": 25,
-  "detectionRadius": 5,
+  "detectionRadius": 80,
   "defenseRadius": 50,
   "contactRadius": 12,
   "maxSpeed": 4.0,
   "aggression": 0.8,
-  "cohesionWeight": 0.5,
-  "alignmentWeight": 0.5,
-  "separationWeight": 0.8,
-  "perceptionRadius": 40.0
+  "cohesionWeight": 0.3,
+  "alignmentWeight": 0.4,
+  "separationWeight": 1.0,
+  "perceptionRadius": 50.0,
+  "separationRadius": 20.0
 }

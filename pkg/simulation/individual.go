@@ -76,9 +76,9 @@ func (i *Individual) RedBehavior(ctx *actor.ReceiveContext) {
 		if len(i.visibleTargets) > 0 {
 			i.chaseClosestTarget()
 		} else {
-			// Random jitter if no target, wander
-			i.vx += (rand.Float64() - 0.5) * 0.1
-			i.vy += (rand.Float64() - 0.5) * 0.2
+			// Random jitter if no target, wander (symmetric for natural movement)
+			i.vx += (rand.Float64() - 0.5) * 0.15
+			i.vy += (rand.Float64() - 0.5) * 0.15
 		}
 		i.updatePosition()
 		i.reportState(ctx)
@@ -116,10 +116,7 @@ func (i *Individual) BlueBehavior(ctx *actor.ReceiveContext) {
 		// Initialize ID here
 		i.ID = ctx.Self().Name()
 	case *Tick:
-		// Blue: Consensual/Swarm behavior (Cohesion could be added here)
-		// For now, they stabilize and drift
-		i.vx += 0.016
-		i.vy += 0.025
+		// Blue: Flocking behavior (Cohesion, Alignment, Separation)
 		// === FLOCKING LOGIC ===
 		// 1. Calculate Acceleration based on neighbors
 		ax := 0.0
@@ -135,10 +132,10 @@ func (i *Individual) BlueBehavior(ctx *actor.ReceiveContext) {
 		// 3. Apply Acceleration
 		i.vx += ax
 		i.vy += ay
-		// --- NEW: PROPULSION ENGINE (The Fix) ---
+		// --- PROPULSION ENGINE ---
 		// Ensure the boid always maintains a minimum cruising speed.
-		// Without this, they settle into a grid and stop.
-		minSpeed := i.cfg.MaxSpeed * 0.5
+		// Reduced to 20% to allow natural slow-down during cohesion.
+		minSpeed := i.cfg.MaxSpeed * 0.2
 		speed := math.Sqrt(i.vx*i.vx + i.vy*i.vy)
 
 		if speed < minSpeed {

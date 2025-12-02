@@ -285,14 +285,12 @@ func (w *WorldActor) processInteractions(ctx *actor.ReceiveContext) {
 			}
 		}
 
-		// Send Perception Update if there is anything interesting around
-		if len(visibleEnemies) > 0 || len(visibleFriends) > 0 {
-			if pid, ok := w.pidsCache[actorRef.Id]; ok {
-				ctx.Tell(pid, &Perception{
-					Targets: visibleEnemies, // Enemies
-					Friends: visibleFriends, // Friends
-				})
-			}
+		// Send Perception Update - always send to clear stale data
+		if pid, ok := w.pidsCache[actorRef.Id]; ok {
+			ctx.Tell(pid, &Perception{
+				Targets: visibleEnemies, // Enemies (may be empty)
+				Friends: visibleFriends, // Friends (may be empty)
+			})
 		}
 	}
 }
