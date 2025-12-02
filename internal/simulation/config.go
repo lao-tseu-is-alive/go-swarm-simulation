@@ -25,19 +25,29 @@ type Config struct {
 	// Physics / Behavior
 	MaxSpeed   float64 `json:"maxSpeed"`   // Previously 5.0
 	Aggression float64 `json:"aggression"` // Previously 0.8
+
+	//Boids flocking parameters
+	CohesionWeight   float64 `json:"cohesionWeight"`
+	AlignmentWeight  float64 `json:"alignmentWeight"`
+	SeparationWeight float64 `json:"separationWeight"`
+	PerceptionRadius float64 `json:"perceptionRadius"` // Often larger than contact radius
 }
 
 func DefaultConfig() *Config {
 	return &Config{
-		WorldWidth:      1000,
-		WorldHeight:     800,
-		NumRedAtStart:   5,
-		NumBlueAtStart:  30,
-		DetectionRadius: 50,
-		DefenseRadius:   40,
-		ContactRadius:   12,
-		MaxSpeed:        5.0,
-		Aggression:      0.8,
+		WorldWidth:       1000,
+		WorldHeight:      800,
+		NumRedAtStart:    5,
+		NumBlueAtStart:   30,
+		DetectionRadius:  50,
+		DefenseRadius:    40,
+		ContactRadius:    12,
+		MaxSpeed:         5.0,
+		Aggression:       0.8,
+		CohesionWeight:   1.0,
+		AlignmentWeight:  1.0,
+		SeparationWeight: 1.5, // Separation usually needs to be higher to prevent overlapping
+		PerceptionRadius: 60.0,
 	}
 }
 

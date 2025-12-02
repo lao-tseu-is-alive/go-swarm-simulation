@@ -110,6 +110,8 @@ type ActorState struct {
 	Color         string                 `protobuf:"bytes,2,opt,name=color,proto3" json:"color,omitempty"` // "RED" or "BLUE"
 	PositionX     float64                `protobuf:"fixed64,3,opt,name=position_x,json=positionX,proto3" json:"position_x,omitempty"`
 	PositionY     float64                `protobuf:"fixed64,4,opt,name=position_y,json=positionY,proto3" json:"position_y,omitempty"`
+	VelocityX     float64                `protobuf:"fixed64,5,opt,name=velocity_x,json=velocityX,proto3" json:"velocity_x,omitempty"`
+	VelocityY     float64                `protobuf:"fixed64,6,opt,name=velocity_y,json=velocityY,proto3" json:"velocity_y,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -172,10 +174,25 @@ func (x *ActorState) GetPositionY() float64 {
 	return 0
 }
 
+func (x *ActorState) GetVelocityX() float64 {
+	if x != nil {
+		return x.VelocityX
+	}
+	return 0
+}
+
+func (x *ActorState) GetVelocityY() float64 {
+	if x != nil {
+		return x.VelocityY
+	}
+	return 0
+}
+
 // Perception is sent by the world to tell an actor what neighbors are visible
 type Perception struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Targets       []*ActorState          `protobuf:"bytes,1,rep,name=targets,proto3" json:"targets,omitempty"`
+	Friends       []*ActorState          `protobuf:"bytes,2,rep,name=friends,proto3" json:"friends,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -213,6 +230,13 @@ func (*Perception) Descriptor() ([]byte, []int) {
 func (x *Perception) GetTargets() []*ActorState {
 	if x != nil {
 		return x.Targets
+	}
+	return nil
+}
+
+func (x *Perception) GetFriends() []*ActorState {
+	if x != nil {
+		return x.Friends
 	}
 	return nil
 }
@@ -446,7 +470,7 @@ const file_pb_simulation_proto_rawDesc = "" +
 	"\n" +
 	"delta_time\x18\x01 \x01(\x03R\tdeltaTime\"\n" +
 	"\n" +
-	"\bGetState\"p\n" +
+	"\bGetState\"\xae\x01\n" +
 	"\n" +
 	"ActorState\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x14\n" +
@@ -454,10 +478,15 @@ const file_pb_simulation_proto_rawDesc = "" +
 	"\n" +
 	"position_x\x18\x03 \x01(\x01R\tpositionX\x12\x1d\n" +
 	"\n" +
-	"position_y\x18\x04 \x01(\x01R\tpositionY\"6\n" +
+	"position_y\x18\x04 \x01(\x01R\tpositionY\x12\x1d\n" +
+	"\n" +
+	"velocity_x\x18\x05 \x01(\x01R\tvelocityX\x12\x1d\n" +
+	"\n" +
+	"velocity_y\x18\x06 \x01(\x01R\tvelocityY\"`\n" +
 	"\n" +
 	"Perception\x12(\n" +
-	"\atargets\x18\x01 \x03(\v2\x0e.pb.ActorStateR\atargets\",\n" +
+	"\atargets\x18\x01 \x03(\v2\x0e.pb.ActorStateR\atargets\x12(\n" +
+	"\afriends\x18\x02 \x03(\v2\x0e.pb.ActorStateR\afriends\",\n" +
 	"\aConvert\x12!\n" +
 	"\ftarget_color\x18\x01 \x01(\tR\vtargetColor\"4\n" +
 	"\fReportStatus\x12$\n" +
@@ -499,13 +528,14 @@ var file_pb_simulation_proto_goTypes = []any{
 }
 var file_pb_simulation_proto_depIdxs = []int32{
 	2, // 0: pb.Perception.targets:type_name -> pb.ActorState
-	2, // 1: pb.ReportStatus.state:type_name -> pb.ActorState
-	2, // 2: pb.WorldSnapshot.actors:type_name -> pb.ActorState
-	3, // [3:3] is the sub-list for method output_type
-	3, // [3:3] is the sub-list for method input_type
-	3, // [3:3] is the sub-list for extension type_name
-	3, // [3:3] is the sub-list for extension extendee
-	0, // [0:3] is the sub-list for field type_name
+	2, // 1: pb.Perception.friends:type_name -> pb.ActorState
+	2, // 2: pb.ReportStatus.state:type_name -> pb.ActorState
+	2, // 3: pb.WorldSnapshot.actors:type_name -> pb.ActorState
+	4, // [4:4] is the sub-list for method output_type
+	4, // [4:4] is the sub-list for method input_type
+	4, // [4:4] is the sub-list for extension type_name
+	4, // [4:4] is the sub-list for extension extendee
+	0, // [0:4] is the sub-list for field type_name
 }
 
 func init() { file_pb_simulation_proto_init() }

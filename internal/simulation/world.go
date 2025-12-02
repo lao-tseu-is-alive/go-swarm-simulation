@@ -24,8 +24,9 @@ type WorldActor struct {
 	// Communication with UI
 	snapshotCh chan<- *WorldSnapshot
 	// Game Settings (received from UI)
-	detectionRadius float64
-	defenseRadius   float64
+	detectionRadius  float64
+	perceptionRadius float64 // For friends (Blue seeking Blue)
+	defenseRadius    float64
 
 	cfg *Config
 }
@@ -33,13 +34,14 @@ type WorldActor struct {
 // NewWorldActor creates the world logic unit
 func NewWorldActor(snapshotCh chan<- *WorldSnapshot, cfg *Config) *WorldActor {
 	return &WorldActor{
-		actors:          make(map[string]*ActorState),
-		pidsCache:       make(map[string]*actor.PID),
-		grid:            make(map[gridKey][]*ActorState),
-		snapshotCh:      snapshotCh,
-		cfg:             cfg,
-		detectionRadius: cfg.DetectionRadius,
-		defenseRadius:   cfg.DefenseRadius,
+		actors:           make(map[string]*ActorState),
+		pidsCache:        make(map[string]*actor.PID),
+		grid:             make(map[gridKey][]*ActorState),
+		snapshotCh:       snapshotCh,
+		cfg:              cfg,
+		detectionRadius:  cfg.DetectionRadius,
+		defenseRadius:    cfg.DefenseRadius,
+		perceptionRadius: cfg.PerceptionRadius,
 	}
 }
 
@@ -140,9 +142,22 @@ func (w *WorldActor) spawnSwarm(ctx *actor.ReceiveContext) {
 		w.pidsCache[name] = pid
 	}
 
+	// BLUE SPAWN
 	for i := 0; i < w.cfg.NumBlueAtStart; i++ {
 		name := fmt.Sprintf("Blue-%03d", i)
-		pid := ctx.Spawn(name, NewIndividual(ColorBlue, float64(i)+300, 250, w.cfg))
+
+		// SPREAD THEM OUT:
+		// X: 300 + (i * 20) -> 300, 320, 340...
+		// Y: 250 + (random jitter) -> prevents perfect vertical alignment
+		startX := 300.0 + float64(i)*10.0
+		startY := 250.0 + (float64(i%5) * 10.0) // Small zigzag
+
+		// Bounds check spawn
+		if startX > w.cfg.WorldWidth-50 {
+			startX = 50 + float64(i)*5
+		}
+
+		pid := ctx.Spawn(name, NewIndividual(ColorBlue, startX, startY, w.cfg))
 		w.pids = append(w.pids, pid)
 		w.pidsCache[name] = pid
 	}
@@ -195,73 +210,88 @@ func (w *WorldActor) getNearbyActors(x, y float64) []*ActorState {
 }
 
 func (w *WorldActor) processInteractions(ctx *actor.ReceiveContext) {
-	detSq := w.detectionRadius * w.detectionRadius
-	defSq := w.defenseRadius * w.defenseRadius
+	// Pre-calculate squared radii for performance
+	detectionSq := w.detectionRadius * w.detectionRadius
+	perceptionSq := w.perceptionRadius * w.perceptionRadius
 	contactSq := w.cfg.ContactRadius * w.cfg.ContactRadius
+	defSq := w.defenseRadius * w.defenseRadius // <--- Declared here
 
-	// Iterate Red actors (Predators)
-	for _, red := range w.actors {
-		if red.Color != ColorRed {
-			continue
-		}
+	// Iterate over every actor to calculate what they see and handle interactions
+	for _, actorRef := range w.actors {
+		// Optimization: Only check relevant grid cells
+		nearby := w.getNearbyActors(actorRef.PositionX, actorRef.PositionY)
 
-		var visibleTargets []*ActorState
-		// OPTIMIZATION: Get only nearby actors (Prey Candidates)
-		// This replaces `range w.actors` with a much smaller list
-		potentialPrey := w.getNearbyActors(red.PositionX, red.PositionY)
+		var visibleEnemies []*ActorState
+		var visibleFriends []*ActorState
 
-		for _, other := range potentialPrey {
-			if other.Color == ColorBlue {
-				distSq := distSquared(red, other)
+		for _, other := range nearby {
+			if other.Id == actorRef.Id {
+				continue // Skip self
+			}
 
-				// Perception
-				if distSq < detSq {
-					visibleTargets = append(visibleTargets, other)
+			distSq := distSquared(actorRef, other)
+
+			// 1. Is it a Friend? (For Flocking)
+			if other.Color == actorRef.Color {
+				if distSq < perceptionSq {
+					visibleFriends = append(visibleFriends, other)
+				}
+			} else {
+				// 2. Is it an Enemy? (For Detection)
+				if distSq < detectionSq {
+					visibleEnemies = append(visibleEnemies, other)
 				}
 
-				// Collision
-				if distSq < contactSq {
-					// === COMBAT LOGIC ===
-					// Check Defense
-					defenders := 0
-					// OPTIMIZATION: Get nearby actors around the VICTIM
-					// We need to look around 'other', not 'red', though they are close.
-					potentialDefenders := w.getNearbyActors(other.PositionX, other.PositionY)
-					for _, def := range potentialDefenders {
-						// A defender must be Blue, not the victim itself, and close enough
-						if def.Color == ColorBlue && def.Id != other.Id {
-							if distSquared(other, def) < defSq {
-								defenders++
+				// 3. Combat Logic (Red attacks Blue)
+				// We only execute this if 'actorRef' is Red and 'other' is Blue
+				// to avoid double-processing the collision or processing Blue-on-Red (passive)
+				if actorRef.Color == ColorRed && other.Color == ColorBlue {
+					if distSq < contactSq {
+						// === COMBAT LOGIC ===
+						// Check Defense
+						defenders := 0
+						// Look for defenders around the VICTIM (other)
+						// We perform a new grid lookup around the victim to be precise
+						potentialDefenders := w.getNearbyActors(other.PositionX, other.PositionY)
+
+						for _, def := range potentialDefenders {
+							// A defender must be Blue, not the victim itself, and close enough
+							if def.Color == ColorBlue && def.Id != other.Id {
+								if distSquared(other, def) < defSq { // <--- defSq USED HERE
+									defenders++
+								}
 							}
 						}
-					}
 
-					// Conversion Logic
-					// Note: Lookups by ID string are slow; in production, cache PIDs or use the Grid
-					// For now, we use the System to find the local actor by name (ID)
-					targetPID := w.pidsCache[other.Id]
-					myPID := w.pidsCache[red.Id] // Inefficient lookup, better to cache PIDs
+						// Conversion Logic
+						targetPID := w.pidsCache[other.Id] // Blue (Victim)
+						myPID := w.pidsCache[actorRef.Id]  // Red (Attacker)
 
-					// Defense Mechanism
-					if defenders >= 3 {
-						// DEFENSE SUCCESS: Red converts to Blue
-						if myPID != nil {
-							ctx.Tell(myPID, &Convert{TargetColor: ColorBlue})
-						}
-					} else {
-						// DEFENSE FAILED: Blue converts to Red
-						if targetPID != nil {
-							ctx.Tell(targetPID, &Convert{TargetColor: ColorRed})
+						// Defense Mechanism
+						if defenders >= 3 {
+							// DEFENSE SUCCESS: Red converts to Blue
+							if myPID != nil {
+								ctx.Tell(myPID, &Convert{TargetColor: ColorBlue})
+							}
+						} else {
+							// DEFENSE FAILED: Blue converts to Red
+							if targetPID != nil {
+								ctx.Tell(targetPID, &Convert{TargetColor: ColorRed})
+							}
 						}
 					}
 				}
 			}
 		}
 
-		// Send Perception Update
-		if len(visibleTargets) > 0 {
-			myPID := w.pidsCache[red.Id]
-			ctx.Tell(myPID, &Perception{Targets: visibleTargets})
+		// Send Perception Update if there is anything interesting around
+		if len(visibleEnemies) > 0 || len(visibleFriends) > 0 {
+			if pid, ok := w.pidsCache[actorRef.Id]; ok {
+				ctx.Tell(pid, &Perception{
+					Targets: visibleEnemies, // Enemies
+					Friends: visibleFriends, // Friends
+				})
+			}
 		}
 	}
 }

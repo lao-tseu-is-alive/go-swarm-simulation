@@ -18,10 +18,13 @@ message ActorState {
   string color = 2; // "RED" or "BLUE"
   double position_x = 3;
   double position_y = 4;
+  double velocity_x = 5;
+  double velocity_y = 6;
 }
 // Perception is sent by the world to tell an actor what neighbors are visible
 message Perception {
   repeated ActorState targets = 1;
+  repeated ActorState friends = 2;
 }
 
 // Convert message is the command to switch teams

@@ -1,11 +1,15 @@
 {
-    "worldWidth": 1000,
-    "worldHeight": 800,
-    "numRedAtStart": 5,
-    "numBlueAtStart": 30,
-    "detectionRadius": 70,
-    "defenseRadius": 40,
-    "contactRadius": 30,
-    "maxSpeed": 5.0,
-    "aggression": 1.0
+  "worldWidth": 800,
+  "worldHeight": 800,
+  "numRedAtStart": 3,
+  "numBlueAtStart": 25,
+  "detectionRadius": 30,
+  "defenseRadius": 30,
+  "contactRadius": 12,
+  "maxSpeed": 15.0,
+  "aggression": 1.0,
+  "cohesionWeight": 0.01,
+  "alignmentWeight": 0.05,
+  "separationWeight": 0.021,
+  "perceptionRadius": 50.0
 }

@@ -20,6 +20,7 @@ type Individual struct {
 	X, Y           float64
 	vx, vy         float64
 	visibleTargets []*ActorState
+	visibleFriends []*ActorState // Friends (Blue)
 	cfg            *Config
 }
 
@@ -75,7 +76,7 @@ func (i *Individual) RedBehavior(ctx *actor.ReceiveContext) {
 		if len(i.visibleTargets) > 0 {
 			i.chaseClosestTarget()
 		} else {
-			// Random jitter if no target
+			// Random jitter if no target, wander
 			i.vx += (rand.Float64() - 0.5) * 0.1
 			i.vy += (rand.Float64() - 0.5) * 0.2
 		}
@@ -84,27 +85,22 @@ func (i *Individual) RedBehavior(ctx *actor.ReceiveContext) {
 
 	case *Perception:
 		i.visibleTargets = msg.Targets
+	// Reds don't care about friends in this version, or maybe they do later for packing?
 
-		// Handle Conversion
+	// Handle Conversion
 	case *Convert:
 		if msg.TargetColor == ColorBlue {
 			ctx.Logger().Infof("%s converting from %s to %s", ctx.Self().Name(), i.Color, msg.TargetColor)
 			i.Color = ColorBlue
 			ctx.Become(i.BlueBehavior) // <--- The Magic thank's to Actor behaviors
 			i.visibleTargets = nil     // Clear memory of old enemies
-
+			i.visibleFriends = nil     // Reset friends
 			// Reaction jump: Push them slightly away to visualize the impact
 			i.vx *= -1.5
 			i.vy *= -1.5
 		}
 	case *GetState:
-		response := &ActorState{
-			Id:        ctx.Self().Name(),
-			Color:     i.Color,
-			PositionX: i.X,
-			PositionY: i.Y,
-		}
-		ctx.Response(response)
+		i.respondState(ctx)
 
 	default:
 		ctx.Unhandled()
@@ -124,12 +120,28 @@ func (i *Individual) BlueBehavior(ctx *actor.ReceiveContext) {
 		// For now, they stabilize and drift
 		i.vx += 0.05
 		i.vy += 0.05
+		// === FLOCKING LOGIC ===
+		// 1. Calculate Acceleration based on neighbors
+		ax := 0.0
+		ay := 0.0
+		ax, ay = ComputeFlockingForce(i, i.visibleFriends, i.cfg)
+
+		// 2. Add randomness if alone to prevent freezing
+		if len(i.visibleFriends) == 0 {
+			ax += (rand.Float64() - 0.5) * 0.5
+			ay += (rand.Float64() - 0.5) * 0.5
+		}
+
+		// 3. Apply Acceleration
+		i.vx += ax
+		i.vy += ay
 		i.updatePosition()
 		//i.applyFlocking() // No "if blue" needed!
 		i.reportState(ctx)
 
-	//case *Perception:
-	//	i.visibleFriends = msg.Targets // Different logic for perception!
+	case *Perception:
+		i.visibleTargets = msg.Targets // Enemies to flee from? (Future feature)
+		i.visibleFriends = msg.Friends // Friends to flock wit
 
 	case *Convert:
 		if msg.TargetColor == ColorRed {
@@ -137,20 +149,13 @@ func (i *Individual) BlueBehavior(ctx *actor.ReceiveContext) {
 			i.Color = ColorRed
 			ctx.Become(i.RedBehavior) // <--- The Magic thank's to Actor behaviors
 			i.visibleTargets = nil    // Clear memory of old enemies
-
+			i.visibleFriends = nil
 			// Reaction jump: Push them slightly away to visualize the impact
 			i.vx *= -1.5
 			i.vy *= -1.5
 		}
 	case *GetState:
-		response := &ActorState{
-			Id:        ctx.Self().Name(),
-			Color:     i.Color,
-			PositionX: i.X,
-			PositionY: i.Y,
-		}
-		ctx.Response(response)
-
+		i.respondState(ctx)
 	}
 }
 
@@ -169,7 +174,20 @@ func (i *Individual) reportState(ctx *actor.ReceiveContext) {
 		ctx.Tell(ctx.Sender(), state)
 	}
 }
+func (i *Individual) respondState(ctx *actor.ReceiveContext) {
+	ctx.Response(i.makeState())
+}
 
+func (i *Individual) makeState() *ActorState {
+	return &ActorState{
+		Id:        i.ID,
+		Color:     i.Color,
+		PositionX: i.X,
+		PositionY: i.Y,
+		VelocityX: i.vx, // Send Velocity!
+		VelocityY: i.vy,
+	}
+}
 func (i *Individual) updatePosition() {
 	// 2. Physics Integration
 	i.X += i.vx
@@ -192,6 +210,14 @@ func (i *Individual) updatePosition() {
 		i.Y = i.cfg.WorldHeight
 		i.vy *= -1
 	}
+	// CRITICAL: i.vx and i.vy Must not be 0
+	if i.vx == 0 {
+		i.vx = 0.01
+	}
+	if i.vy == 0 {
+		i.vy = 0.01
+	}
+
 }
 
 func (i *Individual) chaseClosestTarget() {
