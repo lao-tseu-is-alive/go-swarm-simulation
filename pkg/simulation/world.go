@@ -239,21 +239,14 @@ func (w *WorldActor) processInteractions(ctx *actor.ReceiveContext) {
 				continue // Too far for combat
 			}
 
-			// === OPTIMIZED DEFENSE CHECK ===
-			// Only search actors actually within defense radius
-			potentialDefenders := w.getActorsInRadius(
+			// === COMBAT LOGIC ===
+			defenders := w.countFriendsInRadius(
 				victim.PositionX,
 				victim.PositionY,
 				w.defenseRadius,
+				ColorBlue,
+				victim.Id,
 			)
-
-			// === COMBAT LOGIC ===
-			defenders := 0
-			for _, def := range potentialDefenders {
-				if def.Color == ColorBlue && def.Id != victim.Id {
-					defenders++
-				}
-			}
 
 			// Apply conversion
 			if defenders >= 3 {
@@ -312,9 +305,46 @@ func (w *WorldActor) PostStop(ctx *actor.Context) error {
 	return nil
 }
 
+// countFriendsInRadius returns the count of actors of 'targetColor' within 'radius', excluding 'excludeID'.
+// It performs 0 allocations.
+func (w *WorldActor) countFriendsInRadius(x, y, radius float64, targetColor string, excludeID string) int {
+	radiusSq := radius * radius
+	cellSize := w.getCellSize()
+
+	// Calculate grid bounds
+	minGx := int((x - radius) / cellSize)
+	maxGx := int((x + radius) / cellSize)
+	minGy := int((y - radius) / cellSize)
+	maxGy := int((y + radius) / cellSize)
+
+	count := 0
+
+	for gx := minGx; gx <= maxGx; gx++ {
+		for gy := minGy; gy <= maxGy; gy++ {
+			key := gridKey{x: gx, y: gy}
+			if actors, ok := w.grid[key]; ok {
+				for _, a := range actors {
+					// 1. Check ID and Color FIRST (cheaper than math)
+					if a.Color != targetColor || a.Id == excludeID {
+						continue
+					}
+
+					// 2. Check Distance
+					dx := a.PositionX - x
+					dy := a.PositionY - y
+					if dx*dx+dy*dy < radiusSq {
+						count++
+					}
+				}
+			}
+		}
+	}
+	return count
+}
+
 // getActorsInRadius returns actors within a specific radius of (x, y)
 // More efficient than getNearbyActors when radius << cellSize
-func (w *WorldActor) getActorsInRadius(x, y, radius float64) []*ActorState {
+func (w *WorldActor) getBlueActorsInRadius(x, y, radius float64) []*ActorState {
 	radiusSq := radius * radius
 	cellSize := w.getCellSize()
 
