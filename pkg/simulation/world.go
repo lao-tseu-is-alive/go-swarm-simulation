@@ -3,6 +3,7 @@ package simulation
 import (
 	"fmt"
 	"math"
+	"time"
 
 	"github.com/tochemey/goakt/v3/actor"
 	"github.com/tochemey/goakt/v3/goaktpb"
@@ -27,8 +28,11 @@ type WorldActor struct {
 	detectionRadius float64
 	visualRange     float64 // For friends (Blue seeking Blue)
 	defenseRadius   float64
-
-	cfg *Config
+	cfg             *Config
+	// --- Benchmark Stats ---
+	msgSentCount int
+	msgRecvCount int
+	lastLogTime  time.Time
 }
 
 // NewWorldActor creates the world logic unit
@@ -42,6 +46,9 @@ func NewWorldActor(snapshotCh chan<- *WorldSnapshot, cfg *Config) *WorldActor {
 		detectionRadius: cfg.DetectionRadius,
 		defenseRadius:   cfg.DefenseRadius,
 		visualRange:     cfg.VisualRange,
+		msgSentCount:    0,
+		msgRecvCount:    0,
+		lastLogTime:     time.Now(),
 	}
 }
 
@@ -65,11 +72,24 @@ func (w *WorldActor) Receive(ctx *actor.ReceiveContext) {
 	// 1. Handle Updates from Individuals
 	// You might need to add this message to your Proto or use a wrapper
 	case *ActorState:
+		w.msgRecvCount++
 		w.actors[msg.Id] = msg
 		// We could update the grid here incrementally, or rebuild it in Tick
 
 	// 2. The Main Simulation Step (Driven by Game Loop)
 	case *Tick:
+		// ---  BENCHMARK REPORTING ---
+		if time.Since(w.lastLogTime) >= time.Second {
+			// Calculate rates
+			total := w.msgSentCount + w.msgRecvCount
+			ctx.Logger().Infof("📊 MSG RATE: %d/sec (Sent: %d, Recv: %d) | Actors: %d",
+				total, w.msgSentCount, w.msgRecvCount, len(w.actors))
+
+			// Reset
+			w.msgSentCount = 0
+			w.msgRecvCount = 0
+			w.lastLogTime = time.Now()
+		}
 		// STEP 1: Rebuild spatial grid with CURRENT positions
 		w.rebuildGrid()
 
@@ -79,6 +99,9 @@ func (w *WorldActor) Receive(ctx *actor.ReceiveContext) {
 
 		// STEP 3: Process game logic (conversions)
 		w.processInteractions(ctx)
+
+		// Count Ticks sent
+		w.msgSentCount += len(w.pids)
 
 		// STEP 4: NOW tell actors to move
 		//         They'll use the perception we just sent
@@ -209,6 +232,7 @@ func (w *WorldActor) sendPerceptionUpdates(ctx *actor.ReceiveContext) {
 
 		// Send fresh perception BEFORE they move
 		if pid, ok := w.pidsCache[actorRef.Id]; ok {
+			w.msgSentCount++ // COUNT PERCEPTION MSG
 			ctx.Tell(pid, &Perception{
 				Targets: visibleEnemies,
 				Friends: visibleFriends,
@@ -252,11 +276,13 @@ func (w *WorldActor) processInteractions(ctx *actor.ReceiveContext) {
 			if defenders >= 3 {
 				// Defense success: Convert attacker
 				if pid := w.pidsCache[attacker.Id]; pid != nil {
+					w.msgSentCount++ // <--- COUNT CONVERT MSG
 					ctx.Tell(pid, &Convert{TargetColor: ColorBlue})
 				}
 			} else {
 				// Defense failed: Convert victim
 				if pid := w.pidsCache[victim.Id]; pid != nil {
+					w.msgSentCount++ // <--- COUNT CONVERT MSG
 					ctx.Tell(pid, &Convert{TargetColor: ColorRed})
 				}
 			}
