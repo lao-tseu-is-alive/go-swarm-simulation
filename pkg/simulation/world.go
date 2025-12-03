@@ -3,6 +3,7 @@ package simulation
 import (
 	"fmt"
 	"math"
+	"math/rand/v2"
 	"time"
 
 	"github.com/tochemey/goakt/v3/actor"
@@ -74,47 +75,18 @@ func (w *WorldActor) Receive(ctx *actor.ReceiveContext) {
 	case *ActorState:
 		w.msgRecvCount++
 		w.actors[msg.Id] = msg
-		// We could update the grid here incrementally, or rebuild it in Tick
 
 	// 2. The Main Simulation Step (Driven by Game Loop)
 	case *Tick:
-		// ---  BENCHMARK REPORTING ---
-		if time.Since(w.lastLogTime) >= time.Second {
-			// Calculate rates
-			total := w.msgSentCount + w.msgRecvCount
-			ctx.Logger().Infof("📊 MSG RATE: %d/sec (Sent: %d, Recv: %d) | Actors: %d",
-				total, w.msgSentCount, w.msgRecvCount, len(w.actors))
+		// 1. Telemetry
+		w.logBenchmarks(ctx)
 
-			// Reset
-			w.msgSentCount = 0
-			w.msgRecvCount = 0
-			w.lastLogTime = time.Now()
-		}
-		// STEP 1: Rebuild spatial grid with CURRENT positions
+		// 2. Physics & Logic
 		w.rebuildGrid()
+		w.broadcastSimulationStep(ctx, msg.DeltaTime)
 
-		// STEP 2: Calculate and SEND perception FIRST
-		//         (so actors have fresh data when they process Tick)
-		w.sendPerceptionUpdates(ctx)
-
-		// STEP 3: Process game logic (conversions)
-		w.processInteractions(ctx)
-
-		// Count Ticks sent
-		w.msgSentCount += len(w.pids)
-
-		// STEP 4: NOW tell actors to move
-		//         They'll use the perception we just sent
-		for _, pid := range w.pids {
-			ctx.Tell(pid, msg)
-		}
-
-		// STEP 5: Push snapshot to UI
-		snapshot := w.buildSnapshot()
-		select {
-		case w.snapshotCh <- snapshot:
-		default:
-		}
+		// 3. UI Update
+		w.pushSnapshot()
 
 	// Handle dynamic slider updates from UI
 	case *UpdateConfig: // Defined below or in Proto
@@ -123,33 +95,209 @@ func (w *WorldActor) Receive(ctx *actor.ReceiveContext) {
 	}
 }
 
-func (w *WorldActor) spawnSwarm(ctx *actor.ReceiveContext) {
-	for i := 0; i < w.cfg.NumRedAtStart; i++ {
-		name := fmt.Sprintf("Red-%03d", i)
-		// Spawn using ReceiveContext.Spawn (creates a child)
-		pid := ctx.Spawn(name, NewIndividual(ColorRed, 50+float64(i)*20, 150, 0.2, 0.2, w.cfg))
-		w.pids = append(w.pids, pid)
-		w.pidsCache[name] = pid
+func (w *WorldActor) logBenchmarks(ctx *actor.ReceiveContext) {
+	if time.Since(w.lastLogTime) >= time.Second {
+		total := w.msgSentCount + w.msgRecvCount
+		ctx.Logger().Infof("📊 MSG RATE: %d/sec (Sent: %d, Recv: %d) | Actors: %d",
+			total, w.msgSentCount, w.msgRecvCount, len(w.actors))
+		w.msgSentCount = 0
+		w.msgRecvCount = 0
+		w.lastLogTime = time.Now()
+	}
+}
+
+func (w *WorldActor) pushSnapshot() {
+	select {
+	case w.snapshotCh <- w.buildSnapshot():
+	default:
+		// UI busy, skip frame
+	}
+}
+
+// broadcastSimulationStep is the "Mega Loop" optimized for single-pass execution.
+// It combines Perception gathering, Combat Logic, and Tick dispatching.
+func (w *WorldActor) broadcastSimulationStep(ctx *actor.ReceiveContext, dt int64) {
+	// Pre-calculate squared ranges to avoid Sqrt() calls in loops
+	ranges := struct {
+		perceptionSq float64
+		detectionSq  float64
+		contactSq    float64
+	}{
+		perceptionSq: w.visualRange * w.visualRange,
+		detectionSq:  w.detectionRadius * w.detectionRadius,
+		contactSq:    w.cfg.ContactRadius * w.cfg.ContactRadius,
 	}
 
-	// BLUE SPAWN
-	for i := 0; i < w.cfg.NumBlueAtStart; i++ {
-		name := fmt.Sprintf("Blue-%03d", i)
+	for id, me := range w.actors {
+		// 1. Scan grid for neighbors (Perception + Combat triggers)
+		enemies, friends := w.scanNeighbors(ctx, me, ranges)
 
-		// SPREAD THEM OUT:
-		// X: 300 + (i * 20) -> 300, 320, 340...
-		// Y: 250 + (random jitter) -> prevents perfect vertical alignment
-		startX := 300.0 + float64(i)*10.0
-		startY := 250.0 + (float64(i%5) * 10.0) // Small zigzag
+		// 2. Construct the enriched Tick
+		individualTick := &Tick{
+			DeltaTime: dt,
+			Context: &Perception{
+				Targets: enemies,
+				Friends: friends,
+			},
+		}
 
+		// 3. Dispatch
+		if pid, ok := w.pidsCache[id]; ok {
+			w.msgSentCount++
+			ctx.Tell(pid, individualTick)
+		}
+	}
+}
+
+// scanNeighbors iterates the spatial grid around 'me'.
+// It populates perception lists AND handles combat interactions inline for efficiency.
+func (w *WorldActor) scanNeighbors(ctx *actor.ReceiveContext, me *ActorState, ranges struct{ perceptionSq, detectionSq, contactSq float64 }) ([]*ActorState, []*ActorState) {
+	var visibleEnemies []*ActorState
+	var visibleFriends []*ActorState
+
+	// Get grid bounds for the largest relevant radius (usually Detection or Perception)
+	gx, gy := w.getCellIndices(me.PositionX, me.PositionY)
+
+	// Iterate 3x3 Grid
+	for i := gx - 1; i <= gx+1; i++ {
+		for j := gy - 1; j <= gy+1; j++ {
+			key := gridKey{x: i, y: j}
+			actorsInCell, ok := w.grid[key]
+			if !ok {
+				continue
+			}
+
+			for _, other := range actorsInCell {
+				if other.Id == me.Id {
+					continue
+				}
+
+				distSq := distSquared(me, other)
+
+				// --- Logic Branching ---
+				if other.Color == me.Color {
+					// Friend Logic: Flocking
+					if distSq < ranges.perceptionSq {
+						visibleFriends = append(visibleFriends, other)
+					}
+				} else {
+					// Enemy Logic: Detection
+					if distSq < ranges.detectionSq {
+						visibleEnemies = append(visibleEnemies, other)
+					}
+
+					// Combat Logic: Red attacks Blue
+					// We check this here to avoid re-iterating neighbors later
+					if me.Color == ColorRed && other.Color == ColorBlue {
+						if distSq < ranges.contactSq {
+							w.resolveCombat(ctx, me, other)
+						}
+					}
+				}
+			}
+		}
+	}
+	return visibleEnemies, visibleFriends
+}
+
+// resolveCombat handles the specific rules of engagement
+func (w *WorldActor) resolveCombat(ctx *actor.ReceiveContext, attacker, victim *ActorState) {
+	// Optimization: Use the allocation-free counter we built previously
+	defenders := w.countFriendsInRadius(
+		victim.PositionX,
+		victim.PositionY,
+		w.defenseRadius,
+		ColorBlue, // Target is Blue defenders
+		victim.Id, // Exclude the victim themselves
+	)
+
+	if defenders >= 3 {
+		// Defense Success: Attacker converts to Blue
+		w.sendConvert(ctx, attacker.Id, ColorBlue)
+	} else {
+		// Defense Failed: Victim converts to Red
+		w.sendConvert(ctx, victim.Id, ColorRed)
+	}
+}
+
+func (w *WorldActor) sendConvert(ctx *actor.ReceiveContext, targetID string, newColor string) {
+	if pid := w.pidsCache[targetID]; pid != nil {
+		w.msgSentCount++
+		ctx.Tell(pid, &Convert{TargetColor: newColor})
+	}
+}
+
+func (w *WorldActor) spawnSwarm(ctx *actor.ReceiveContext) {
+	var (
+		redX     = w.cfg.WorldWidth / 6
+		redY     = w.cfg.WorldHeight / 6
+		incRedX  = math.Min(w.cfg.WorldHeight/float64(w.cfg.NumRedAtStart), w.cfg.DetectionRadius)
+		incRedY  = math.Min(w.cfg.WorldHeight/float64(w.cfg.NumRedAtStart), w.cfg.DetectionRadius)
+		blueX    = (w.cfg.WorldWidth / 4) * 2
+		blueY    = (w.cfg.WorldHeight / 4) * 2
+		incBlueX = math.Min(w.cfg.WorldHeight/float64(w.cfg.NumBlueAtStart), w.cfg.DefenseRadius)
+		incBlueY = math.Min(w.cfg.WorldHeight/float64(w.cfg.NumBlueAtStart), w.cfg.DefenseRadius)
+	)
+	// 1. SPAWN REDS
+	for i := 0; i < w.cfg.NumRedAtStart; i++ {
+		name := fmt.Sprintf("Red-%03d", i)
+		startX := redX + float64(i)*incRedX*rand.Float64()*2
+		startY := redY + float64(i)*incRedY*rand.Float64()*2
 		// Bounds check spawn
 		if startX > w.cfg.WorldWidth-50 {
 			startX = 50 + float64(i)*5
 		}
+		if startY > w.cfg.WorldHeight-50 {
+			startY = 50 + float64(i)*5
+		}
+		// Calculate Random Velocity HERE
+		vx := (rand.Float64() - 0.5) * 2
+		vy := (rand.Float64() - 0.5) * 2
 
-		pid := ctx.Spawn(name, NewIndividual(ColorBlue, startX, startY, 0.2, 0.2, w.cfg))
+		pid := ctx.Spawn(name, NewIndividual(ColorRed, startX, startY, vx, vy, w.cfg))
 		w.pids = append(w.pids, pid)
 		w.pidsCache[name] = pid
+
+		// We must insert the actor into the map NOW, so the very first Tick loop
+		// sees it and sends it a message.
+		w.actors[name] = &ActorState{
+			Id:        name,
+			Color:     ColorRed,
+			PositionX: startX,
+			PositionY: startY,
+			VelocityX: vx,
+			VelocityY: vy,
+		}
+	}
+
+	// 2. SPAWN BLUES
+	for i := 0; i < w.cfg.NumBlueAtStart; i++ {
+		name := fmt.Sprintf("Blue-%03d", i)
+
+		startX := blueX + float64(i)*incBlueX*rand.Float64()*2
+		startY := blueY + (float64(i%5)*incBlueY)*rand.Float64()*2
+		// Bounds check spawn
+		if startX > w.cfg.WorldWidth-50 {
+			startX = 50 + float64(i)*5
+		}
+		if startY > w.cfg.WorldHeight-50 {
+			startY = 50 + float64(i)*5
+		}
+		vx := (rand.Float64() - 0.5) * 2
+		vy := (rand.Float64() - 0.5) * 2
+
+		pid := ctx.Spawn(name, NewIndividual(ColorBlue, startX, startY, vx, vy, w.cfg))
+		w.pids = append(w.pids, pid)
+		w.pidsCache[name] = pid
+
+		w.actors[name] = &ActorState{
+			Id:        name,
+			Color:     ColorBlue,
+			PositionX: startX,
+			PositionY: startY,
+			VelocityX: vx,
+			VelocityY: vy,
+		}
 	}
 }
 

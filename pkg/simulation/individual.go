@@ -30,8 +30,8 @@ func NewIndividual(color string, startX, startY, vx, vy float64, cfg *Config) *I
 		Color: color,
 		X:     startX,
 		Y:     startY,
-		vx:    vx + (rand.Float64()-0.5)*2,
-		vy:    vy + (rand.Float64()-0.5)*2,
+		vx:    vx,
+		vy:    vy,
 		cfg:   cfg,
 	}
 }
@@ -78,12 +78,12 @@ func (i *Individual) RedBehavior(ctx *actor.ReceiveContext) {
 		i.ID = ctx.Self().Name()
 		i.Log(ctx.ActorSystem(), "%s started in RED mode", i.ID)
 
-	case *Perception:
-		// Update sensory data BEFORE movement
-		i.visibleTargets = msg.Targets
-		i.visibleFriends = msg.Friends
-
 	case *Tick:
+		// EXTRACT PERCEPTION
+		if msg.Context != nil {
+			i.visibleTargets = msg.Context.Targets
+			i.visibleFriends = msg.Context.Friends
+		}
 		i.updateAsRed()
 		i.reportState(ctx)
 
@@ -120,12 +120,12 @@ func (i *Individual) BlueBehavior(ctx *actor.ReceiveContext) {
 		i.ID = ctx.Self().Name()
 		i.Log(ctx.ActorSystem(), "%s started in BLUE mode", i.ID)
 
-	case *Perception:
-		// Update sensory data BEFORE movement
-		i.visibleTargets = msg.Targets // Predators to flee from (future feature?)
-		i.visibleFriends = msg.Friends // Flock-mates
-
 	case *Tick:
+		// EXTRACT PERCEPTION
+		if msg.Context != nil {
+			i.visibleTargets = msg.Context.Targets
+			i.visibleFriends = msg.Context.Friends
+		}
 		i.updateAsBlue()
 		i.reportState(ctx)
 
@@ -170,7 +170,7 @@ func (i *Individual) handleConversion(ctx *actor.ReceiveContext, msg *Convert) {
 		ctx.Become(i.BlueBehavior)
 	}
 
-	// Visual feedback: "Explosion" effect
+	// Visual feedback: "Explosion" Bounce effect
 	i.vx *= -1.5
 	i.vy *= -1.5
 

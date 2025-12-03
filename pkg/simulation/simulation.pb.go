@@ -25,6 +25,7 @@ const (
 type Tick struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	DeltaTime     int64                  `protobuf:"varint,1,opt,name=delta_time,json=deltaTime,proto3" json:"delta_time,omitempty"` // Time elapsed since last frame
+	Context       *Perception            `protobuf:"bytes,2,opt,name=context,proto3" json:"context,omitempty"`                       // Optional field
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -64,6 +65,13 @@ func (x *Tick) GetDeltaTime() int64 {
 		return x.DeltaTime
 	}
 	return 0
+}
+
+func (x *Tick) GetContext() *Perception {
+	if x != nil {
+		return x.Context
+	}
+	return nil
 }
 
 // Sent by the World to ask for current status
@@ -465,10 +473,11 @@ var File_pb_simulation_proto protoreflect.FileDescriptor
 
 const file_pb_simulation_proto_rawDesc = "" +
 	"\n" +
-	"\x13pb/simulation.proto\x12\x02pb\"%\n" +
+	"\x13pb/simulation.proto\x12\x02pb\"O\n" +
 	"\x04Tick\x12\x1d\n" +
 	"\n" +
-	"delta_time\x18\x01 \x01(\x03R\tdeltaTime\"\n" +
+	"delta_time\x18\x01 \x01(\x03R\tdeltaTime\x12(\n" +
+	"\acontext\x18\x02 \x01(\v2\x0e.pb.PerceptionR\acontext\"\n" +
 	"\n" +
 	"\bGetState\"\xae\x01\n" +
 	"\n" +
@@ -527,15 +536,16 @@ var file_pb_simulation_proto_goTypes = []any{
 	(*UpdateConfig)(nil),  // 7: pb.UpdateConfig
 }
 var file_pb_simulation_proto_depIdxs = []int32{
-	2, // 0: pb.Perception.targets:type_name -> pb.ActorState
-	2, // 1: pb.Perception.friends:type_name -> pb.ActorState
-	2, // 2: pb.ReportStatus.state:type_name -> pb.ActorState
-	2, // 3: pb.WorldSnapshot.actors:type_name -> pb.ActorState
-	4, // [4:4] is the sub-list for method output_type
-	4, // [4:4] is the sub-list for method input_type
-	4, // [4:4] is the sub-list for extension type_name
-	4, // [4:4] is the sub-list for extension extendee
-	0, // [0:4] is the sub-list for field type_name
+	3, // 0: pb.Tick.context:type_name -> pb.Perception
+	2, // 1: pb.Perception.targets:type_name -> pb.ActorState
+	2, // 2: pb.Perception.friends:type_name -> pb.ActorState
+	2, // 3: pb.ReportStatus.state:type_name -> pb.ActorState
+	2, // 4: pb.WorldSnapshot.actors:type_name -> pb.ActorState
+	5, // [5:5] is the sub-list for method output_type
+	5, // [5:5] is the sub-list for method input_type
+	5, // [5:5] is the sub-list for extension type_name
+	5, // [5:5] is the sub-list for extension extendee
+	0, // [0:5] is the sub-list for field type_name
 }
 
 func init() { file_pb_simulation_proto_init() }
