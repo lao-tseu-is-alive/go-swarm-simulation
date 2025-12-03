@@ -8,7 +8,6 @@ import (
 	"github.com/tochemey/goakt/v3/goaktpb"
 )
 
-// Enum Constants for Color
 const (
 	ColorRed  = "🔴 RED"
 	ColorBlue = "🔵 BLUE"
@@ -19,8 +18,8 @@ type Individual struct {
 	Color          string
 	X, Y           float64
 	vx, vy         float64
-	visibleTargets []*ActorState
-	visibleFriends []*ActorState // Friends (Blue)
+	visibleTargets []*ActorState // Enemies
+	visibleFriends []*ActorState // Allies
 	cfg            *Config
 }
 
@@ -37,135 +36,158 @@ func NewIndividual(color string, startX, startY, vx, vy float64, cfg *Config) *I
 	}
 }
 
+// ============================================================================
+// Actor Lifecycle Hooks
+// ============================================================================
+
 func (i *Individual) PreStart(ctx *actor.Context) error {
-	// ctx.ActorName() might be deprecated in v3 favor of ctx.Name()
-	// but let's assume ctx.ActorName() or ctx.Name() works.
-	// If Error: use ctx.Self().Name() in Receive
 	i.ID = ctx.ActorName()
-	i.Log(ctx.ActorSystem(), "Born: %s (%s) at %.2f, %.2f", i.ID, i.Color, i.X, i.Y)
+	i.Log(ctx.ActorSystem(), "Born: %s (%s) at (%.1f, %.1f)",
+		i.ID, i.Color, i.X, i.Y)
 	return nil
 }
 
+func (i *Individual) PostStop(ctx *actor.Context) error {
+	i.Log(ctx.ActorSystem(), "Death: %s", ctx.ActorName())
+	return nil
+}
+
+// ============================================================================
+// Message Routing (Entry Point)
+// ============================================================================
+
 func (i *Individual) Receive(ctx *actor.ReceiveContext) {
-	// Determine initial behavior based on color
+	// Route to appropriate behavior based on current color
 	if i.Color == ColorRed {
 		ctx.Become(i.RedBehavior)
-		i.RedBehavior(ctx) // process current message
+		i.RedBehavior(ctx)
 	} else {
 		ctx.Become(i.BlueBehavior)
 		i.BlueBehavior(ctx)
 	}
-
 }
 
-func (i *Individual) PostStop(ctx *actor.Context) error {
-	i.Log(ctx.ActorSystem(), "Death : %s", ctx.ActorName())
-	return nil
-}
+// ============================================================================
+// RED BEHAVIOR: Aggressive Hunter
+// ============================================================================
 
-// RedBehavior Behavior for RED (Aggressive)
 func (i *Individual) RedBehavior(ctx *actor.ReceiveContext) {
 	switch msg := ctx.Message().(type) {
-	case *goaktpb.PostStart:
-		i.Log(ctx.ActorSystem(), "%s started", ctx.Self().Name())
-		// Initialize ID here
-		i.ID = ctx.Self().Name()
 
-	case *Tick:
-		// Aggressive Chase behavior
-		if len(i.visibleTargets) > 0 {
-			i.chaseClosestTarget()
-		} else {
-			// Random jitter if no target, wander (symmetric for natural movement)
-			i.vx += (rand.Float64() - 0.5) * 0.15
-			i.vy += (rand.Float64() - 0.5) * 0.15
-		}
-		i.updateBouncePosition()
-		i.reportState(ctx)
+	case *goaktpb.PostStart:
+		i.ID = ctx.Self().Name()
+		i.Log(ctx.ActorSystem(), "%s started in RED mode", i.ID)
 
 	case *Perception:
+		// Update sensory data BEFORE movement
 		i.visibleTargets = msg.Targets
-	// Reds don't care about friends in this version, or maybe they do later for packing?
+		i.visibleFriends = msg.Friends
 
-	// Handle Conversion
+	case *Tick:
+		i.updateAsRed()
+		i.reportState(ctx)
+
 	case *Convert:
-		if msg.TargetColor == ColorBlue {
-			i.Log(ctx.ActorSystem(), "%s converting from %s to %s", ctx.Self().Name(), i.Color, msg.TargetColor)
-			i.Color = ColorBlue
-			ctx.Become(i.BlueBehavior) // <--- The Magic thank's to Actor behaviors
-			i.visibleTargets = nil     // Clear memory of old enemies
-			i.visibleFriends = nil     // Reset friends
-			// Reaction jump: Push them slightly away to visualize the impact
-			i.vx *= -1.5
-			i.vy *= -1.5
-		}
+		i.handleConversion(ctx, msg)
+
 	case *GetState:
 		i.respondState(ctx)
 
 	default:
 		ctx.Unhandled()
 	}
-
 }
 
-// BlueBehavior  Behavior for BLUE (Flocking)
+func (i *Individual) updateAsRed() {
+	if len(i.visibleTargets) > 0 {
+		i.chaseClosestTarget()
+	} else {
+		// Wander when no targets visible
+		i.vx += (rand.Float64() - 0.5) * 0.15
+		i.vy += (rand.Float64() - 0.5) * 0.15
+	}
+	i.updateBouncePosition()
+}
+
+// ============================================================================
+// BLUE BEHAVIOR: Flocking Prey
+// ============================================================================
+
 func (i *Individual) BlueBehavior(ctx *actor.ReceiveContext) {
 	switch msg := ctx.Message().(type) {
+
 	case *goaktpb.PostStart:
-		i.Log(ctx.ActorSystem(), "%s started", ctx.Self().Name())
-		// Initialize ID here
 		i.ID = ctx.Self().Name()
-	case *Tick:
-		// Blue: Flocking behavior (Cohesion, Alignment, Separation)
-		// === FLOCKING LOGIC ===
-		// 1. Calculate Velocity based on neighbors
-		vx, vy := ComputeBoidUpdate(i, i.visibleFriends, i.cfg)
-		i.vx = vx
-		i.vy = vy
-
-		// 2. Update Position (Soft Turn + Move)
-		i.updateSoftTurnPosition()
-
-		i.reportState(ctx)
+		i.Log(ctx.ActorSystem(), "%s started in BLUE mode", i.ID)
 
 	case *Perception:
-		i.visibleTargets = msg.Targets // Enemies to flee from? (Future feature)
-		i.visibleFriends = msg.Friends // Friends to flock wit
+		// Update sensory data BEFORE movement
+		i.visibleTargets = msg.Targets // Predators to flee from (future feature?)
+		i.visibleFriends = msg.Friends // Flock-mates
+
+	case *Tick:
+		i.updateAsBlue()
+		i.reportState(ctx)
 
 	case *Convert:
-		if msg.TargetColor == ColorRed {
-			i.Log(ctx.ActorSystem(), "%s converting from %s to %s", ctx.Self().Name(), i.Color, msg.TargetColor)
-			i.Color = ColorRed
-			ctx.Become(i.RedBehavior) // <--- The Magic thank's to Actor behaviors
-			i.visibleTargets = nil    // Clear memory of old enemies
-			i.visibleFriends = nil
-			// Reaction jump: Push them slightly away to visualize the impact
-			i.vx *= -1.5
-			i.vy *= -1.5
-		}
+		i.handleConversion(ctx, msg)
+
 	case *GetState:
 		i.respondState(ctx)
+
+	default:
+		ctx.Unhandled()
 	}
+}
+
+func (i *Individual) updateAsBlue() {
+	// Apply boids flocking rules
+	vx, vy := ComputeBoidUpdate(i, i.visibleFriends, i.cfg)
+	i.vx = vx
+	i.vy = vy
+	i.updateSoftTurnPosition()
+}
+
+// ============================================================================
+// Shared Behaviors
+// ============================================================================
+
+func (i *Individual) handleConversion(ctx *actor.ReceiveContext, msg *Convert) {
+	if msg.TargetColor == i.Color {
+		return // Already this color
+	}
+
+	oldColor := i.Color
+	i.Color = msg.TargetColor
+
+	i.Log(ctx.ActorSystem(), "%s converting: %s → %s",
+		ctx.Self().Name(), oldColor, i.Color)
+
+	// Switch behavior function
+	if i.Color == ColorRed {
+		ctx.Become(i.RedBehavior)
+	} else {
+		ctx.Become(i.BlueBehavior)
+	}
+
+	// Visual feedback: "Explosion" effect
+	i.vx *= -1.5
+	i.vy *= -1.5
+
+	// Reset sensory memory
+	i.visibleTargets = nil
+	i.visibleFriends = nil
 }
 
 func (i *Individual) reportState(ctx *actor.ReceiveContext) {
-	// Prepare state to send back to World
-	// i.Log(ctx.ActorSystem(), "%s (%6f,%6f) -> [%6d,%6d]", i.ID, i.X, i.Y, i.vx, i.vy)
-	state := &ActorState{
-		Id:        ctx.Self().Name(),
-		Color:     i.Color,
-		PositionX: i.X,
-		PositionY: i.Y,
-		VelocityX: i.vx,
-		VelocityY: i.vy,
-	}
+	state := i.makeState()
 
-	// REPORT TO WORLD
-	// Since 'Tick' came from the World, ctx.Sender() IS the World.
+	// Reply to sender (should be World)
 	if ctx.Sender() != nil && ctx.Sender() != ctx.ActorSystem().NoSender() {
 		ctx.Tell(ctx.Sender(), state)
 	}
 }
+
 func (i *Individual) respondState(ctx *actor.ReceiveContext) {
 	ctx.Response(i.makeState())
 }
@@ -176,74 +198,95 @@ func (i *Individual) makeState() *ActorState {
 		Color:     i.Color,
 		PositionX: i.X,
 		PositionY: i.Y,
-		VelocityX: i.vx, // Send Velocity!
+		VelocityX: i.vx,
 		VelocityY: i.vy,
 	}
 }
 
+// ============================================================================
+// Physics / Movement
+// ============================================================================
+
 func (i *Individual) updateBouncePosition() {
-	// 2. Physics Integration
+	// Integrate velocity
 	i.X += i.vx
 	i.Y += i.vy
 
-	// 3. World Bounds
+	// Bounce off walls
 	if i.X < 0 {
 		i.X = 0
 		i.vx *= -1
-	}
-	if i.X > i.cfg.WorldWidth {
+	} else if i.X > i.cfg.WorldWidth {
 		i.X = i.cfg.WorldWidth
 		i.vx *= -1
 	}
+
 	if i.Y < 0 {
 		i.Y = 0
 		i.vy *= -1
-	}
-	if i.Y > i.cfg.WorldHeight {
+	} else if i.Y > i.cfg.WorldHeight {
 		i.Y = i.cfg.WorldHeight
 		i.vy *= -1
 	}
-	// CRITICAL: i.vx and i.vy Must not be 0
+
+	// Prevent zero velocity (would break angle calculations)
+	const minVel = 0.01
 	if i.vx == 0 {
-		i.vx = 0.01
+		i.vx = minVel
 	}
 	if i.vy == 0 {
-		i.vy = 0.01
+		i.vy = minVel
 	}
 }
 
 func (i *Individual) updateSoftTurnPosition() {
-	// Screen Edges (Soft turn)
-	margin := 100.0
-	if i.X < margin {
-		i.vx += i.cfg.TurnFactor
-	}
-	if i.X > i.cfg.WorldWidth-margin {
-		i.vx -= i.cfg.TurnFactor
-	}
-	if i.Y < margin {
-		i.vy += i.cfg.TurnFactor
-	}
-	if i.Y > i.cfg.WorldHeight-margin {
-		i.vy -= i.cfg.TurnFactor
-	}
+	// Apply screen-edge avoidance
+	i.applySoftBoundaries()
 
-	// Speed Limits
-	speed := math.Sqrt(i.vx*i.vx + i.vy*i.vy)
-	if speed > i.cfg.MaxSpeed {
-		i.vx = (i.vx / speed) * i.cfg.MaxSpeed
-		i.vy = (i.vy / speed) * i.cfg.MaxSpeed
-	} else if speed < i.cfg.MinSpeed {
-		i.vx = (i.vx / speed) * i.cfg.MinSpeed
-		i.vy = (i.vy / speed) * i.cfg.MinSpeed
-	}
+	// Clamp speed
+	i.applySpeedLimits()
 
-	// Move
+	// Integrate velocity
 	i.X += i.vx
 	i.Y += i.vy
 }
 
+func (i *Individual) applySoftBoundaries() {
+	const margin = 100.0
+
+	if i.X < margin {
+		i.vx += i.cfg.TurnFactor
+	} else if i.X > i.cfg.WorldWidth-margin {
+		i.vx -= i.cfg.TurnFactor
+	}
+
+	if i.Y < margin {
+		i.vy += i.cfg.TurnFactor
+	} else if i.Y > i.cfg.WorldHeight-margin {
+		i.vy -= i.cfg.TurnFactor
+	}
+}
+
+func (i *Individual) applySpeedLimits() {
+	speed := math.Sqrt(i.vx*i.vx + i.vy*i.vy)
+
+	if speed > i.cfg.MaxSpeed {
+		scale := i.cfg.MaxSpeed / speed
+		i.vx *= scale
+		i.vy *= scale
+	} else if speed < i.cfg.MinSpeed && speed > 0 {
+		scale := i.cfg.MinSpeed / speed
+		i.vx *= scale
+		i.vy *= scale
+	}
+}
+
 func (i *Individual) chaseClosestTarget() {
+	if len(i.visibleTargets) == 0 {
+		return
+	}
+
+	// Find nearest enemy
 	var closest *ActorState
 	minDistSq := math.MaxFloat64
 
@@ -258,30 +301,37 @@ func (i *Individual) chaseClosestTarget() {
 		}
 	}
 
-	if closest != nil {
-		dx := closest.PositionX - i.X
-		dy := closest.PositionY - i.Y
-		length := math.Sqrt(dx*dx + dy*dy)
-		if length > 0 {
-			dx /= length
-			dy /= length
-		}
+	if closest == nil {
+		return
+	}
 
-		aggression := i.cfg.Aggression // Increased aggression for better catching
-		i.vx += dx * aggression
-		i.vy += dy * aggression
+	// Calculate pursuit vector
+	dx := closest.PositionX - i.X
+	dy := closest.PositionY - i.Y
+	length := math.Sqrt(dx*dx + dy*dy)
 
-		// Cap max speed
-		maxSpeed := i.cfg.MaxSpeed
-		speed := math.Sqrt(i.vx*i.vx + i.vy*i.vy)
-		if speed > maxSpeed {
-			i.vx = (i.vx / speed) * maxSpeed
-			i.vy = (i.vy / speed) * maxSpeed
-		}
+	if length > 0 {
+		// Normalize and scale by aggression
+		dx = (dx / length) * i.cfg.Aggression
+		dy = (dy / length) * i.cfg.Aggression
+
+		i.vx += dx
+		i.vy += dy
+	}
+
+	// Cap at max speed
+	speed := math.Sqrt(i.vx*i.vx + i.vy*i.vy)
+	if speed > i.cfg.MaxSpeed {
+		scale := i.cfg.MaxSpeed / speed
+		i.vx *= scale
+		i.vy *= scale
 	}
 }
 
-// Log is a helper to log messages with the actor's ID
+// ============================================================================
+// Utilities
+// ============================================================================
+
 func (i *Individual) Log(sys actor.ActorSystem, format string, args ...interface{}) {
 	sys.Logger().Infof("[%s] "+format, append([]interface{}{i.ID}, args...)...)
 }

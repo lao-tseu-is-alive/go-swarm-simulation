@@ -75,6 +75,22 @@ func DefaultConfig() *Config {
 	}
 }
 
+func (c *Config) Validate() error {
+	if c.DefenseRadius > c.DetectionRadius {
+		return fmt.Errorf("defenseRadius (%f) cannot exceed detectionRadius (%f)",
+			c.DefenseRadius, c.DetectionRadius)
+	}
+	if c.ContactRadius > c.DefenseRadius {
+		return fmt.Errorf("contactRadius (%f) should be ≤ defenseRadius (%f)",
+			c.ContactRadius, c.DefenseRadius)
+	}
+	if c.MinSpeed >= c.MaxSpeed {
+		return fmt.Errorf("minSpeed (%f) must be < maxSpeed (%f)",
+			c.MinSpeed, c.MaxSpeed)
+	}
+	return nil
+}
+
 // LoadConfig loads configuration from a JSON file and validates it against the schema.
 func LoadConfig(configFile string, schemaFile string) (*Config, error) {
 	// 1. Compile Schema
@@ -112,6 +128,11 @@ func LoadConfig(configFile string, schemaFile string) (*Config, error) {
 	var cfg Config
 	if err := json.Unmarshal(b, &cfg); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
+	}
+
+	err = cfg.Validate()
+	if err != nil {
+		return nil, err
 	}
 
 	return &cfg, nil

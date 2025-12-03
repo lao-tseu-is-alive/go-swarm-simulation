@@ -70,60 +70,27 @@ func (w *WorldActor) Receive(ctx *actor.ReceiveContext) {
 
 	// 2. The Main Simulation Step (Driven by Game Loop)
 	case *Tick:
-		// A. Rebuild Spatial Grid for O(1) lookups
+		// STEP 1: Rebuild spatial grid with CURRENT positions
 		w.rebuildGrid()
 
-		// B. Run Game Logic (Collision/Defense)
+		// STEP 2: Calculate and SEND perception FIRST
+		//         (so actors have fresh data when they process Tick)
+		w.sendPerceptionUpdates(ctx)
+
+		// STEP 3: Process game logic (conversions)
 		w.processInteractions(ctx)
 
-		// C. Tick all children so they move
+		// STEP 4: NOW tell actors to move
+		//         They'll use the perception we just sent
 		for _, pid := range w.pids {
-			// Forward the Tick to children
 			ctx.Tell(pid, msg)
 		}
 
-		// D. Push Snapshot to UI
-		// Convert map to slice for the renderer
-		snapshot := &WorldSnapshot{
-			Actors:    make([]*ActorState, 0, len(w.actors)),
-			RedCount:  0,
-			BlueCount: 0,
-		}
-		for _, state := range w.actors {
-			snapshot.Actors = append(snapshot.Actors, state)
-			// "Free" calculation during iteration
-			// We could increment/decrement a counter every time a Convert message happens.
-			// However, in distributed actor systems, state drift is a common bug
-			// (e.g., an actor dies without reporting, or a conversion message is lost).
-			// Recalculating from the source of truth (w.actors map) every frame ensures
-			// UI never desynchronizes from the actual simulation state.
-			if state.Color == ColorRed {
-				snapshot.RedCount++
-			} else {
-				snapshot.BlueCount++
-			}
-		}
-		// We add a check: (snapshot.RedCount + snapshot.BlueCount > 0)
-		// This ensures we don't trigger Game Over during the first few frames
-		// when the map is still empty/initializing.
-		totalPopulation := snapshot.RedCount + snapshot.BlueCount
-
-		if totalPopulation > 0 {
-			// Check Victory Condition
-			if snapshot.RedCount == 0 {
-				snapshot.IsGameOver = true
-				snapshot.Winner = ColorBlue
-			} else if snapshot.BlueCount == 0 {
-				snapshot.IsGameOver = true
-				snapshot.Winner = ColorRed
-			}
-		}
-
-		// Non-blocking send to avoid slowing down simulation if UI is slow
+		// STEP 5: Push snapshot to UI
+		snapshot := w.buildSnapshot()
 		select {
 		case w.snapshotCh <- snapshot:
 		default:
-			// UI is busy, skip this frame update
 		}
 
 	// Handle dynamic slider updates from UI
@@ -188,6 +155,7 @@ func (w *WorldActor) getCellSize() float64 {
 	// Clamp to a minimum of 10 to avoid tiny grids or div by zero
 	return math.Max(maxRadius, 10.0)
 }
+
 func (w *WorldActor) getCellIndices(x, y float64) (int, int) {
 	cs := w.getCellSize()
 	return int(x / cs), int(y / cs)
@@ -210,16 +178,12 @@ func (w *WorldActor) getNearbyActors(x, y float64) []*ActorState {
 	return neighbors
 }
 
-func (w *WorldActor) processInteractions(ctx *actor.ReceiveContext) {
-	// Pre-calculate squared radii for performance
-	detectionSq := w.detectionRadius * w.detectionRadius
+// NEW METHOD: Separate perception broadcasting
+func (w *WorldActor) sendPerceptionUpdates(ctx *actor.ReceiveContext) {
 	perceptionSq := w.visualRange * w.visualRange
-	contactSq := w.cfg.ContactRadius * w.cfg.ContactRadius
-	defSq := w.defenseRadius * w.defenseRadius
+	detectionSq := w.detectionRadius * w.detectionRadius
 
-	// Iterate over every actor to calculate what they see and handle interactions
 	for _, actorRef := range w.actors {
-		// Optimization: Only check relevant grid cells
 		nearby := w.getNearbyActors(actorRef.PositionX, actorRef.PositionY)
 
 		var visibleEnemies []*ActorState
@@ -227,72 +191,114 @@ func (w *WorldActor) processInteractions(ctx *actor.ReceiveContext) {
 
 		for _, other := range nearby {
 			if other.Id == actorRef.Id {
-				continue // Skip self
+				continue
 			}
 
 			distSq := distSquared(actorRef, other)
 
-			// 1. Is it a Friend? (For Flocking)
 			if other.Color == actorRef.Color {
 				if distSq < perceptionSq {
 					visibleFriends = append(visibleFriends, other)
 				}
 			} else {
-				// 2. Is it an Enemy? (For Detection)
 				if distSq < detectionSq {
 					visibleEnemies = append(visibleEnemies, other)
-				}
-
-				// 3. Combat Logic (Red attacks Blue)
-				// We only execute this if 'actorRef' is Red and 'other' is Blue
-				// to avoid double-processing the collision or processing Blue-on-Red (passive)
-				if actorRef.Color == ColorRed && other.Color == ColorBlue {
-					if distSq < contactSq {
-						// === COMBAT LOGIC ===
-						// Check Defense
-						defenders := 0
-						// Look for defenders around the VICTIM (other)
-						// We perform a new grid lookup around the victim to be precise
-						potentialDefenders := w.getNearbyActors(other.PositionX, other.PositionY)
-
-						for _, def := range potentialDefenders {
-							// A defender must be Blue, not the victim itself, and close enough
-							if def.Color == ColorBlue && def.Id != other.Id {
-								if distSquared(other, def) < defSq { // <--- defSq USED HERE
-									defenders++
-								}
-							}
-						}
-
-						// Conversion Logic
-						targetPID := w.pidsCache[other.Id] // Blue (Victim)
-						myPID := w.pidsCache[actorRef.Id]  // Red (Attacker)
-
-						// Defense Mechanism
-						if defenders >= 3 {
-							// DEFENSE SUCCESS: Red converts to Blue
-							if myPID != nil {
-								ctx.Tell(myPID, &Convert{TargetColor: ColorBlue})
-							}
-						} else {
-							// DEFENSE FAILED: Blue converts to Red
-							if targetPID != nil {
-								ctx.Tell(targetPID, &Convert{TargetColor: ColorRed})
-							}
-						}
-					}
 				}
 			}
 		}
 
-		// Send Perception Update - always send to clear stale data
+		// Send fresh perception BEFORE they move
 		if pid, ok := w.pidsCache[actorRef.Id]; ok {
 			ctx.Tell(pid, &Perception{
-				Targets: visibleEnemies, // Enemies (may be empty)
-				Friends: visibleFriends, // Friends (may be empty)
+				Targets: visibleEnemies,
+				Friends: visibleFriends,
 			})
 		}
 	}
+}
+
+// processInteractions  Only handle combat now
+func (w *WorldActor) processInteractions(ctx *actor.ReceiveContext) {
+	contactSq := w.cfg.ContactRadius * w.cfg.ContactRadius
+
+	// Only iterate Red actors to avoid double-processing
+	for _, attacker := range w.actors {
+		if attacker.Color != ColorRed {
+			continue // Skip Blues
+		}
+
+		nearby := w.getNearbyActors(attacker.PositionX, attacker.PositionY)
+
+		for _, victim := range nearby {
+			if victim.Color != ColorBlue {
+				continue // Only attack Blues
+			}
+
+			distSq := distSquared(attacker, victim)
+			if distSq >= contactSq {
+				continue // Too far for combat
+			}
+
+			// === OPTIMIZED DEFENSE CHECK ===
+			// Only search actors actually within defense radius
+			potentialDefenders := w.getActorsInRadius(
+				victim.PositionX,
+				victim.PositionY,
+				w.defenseRadius,
+			)
+
+			// === COMBAT LOGIC ===
+			defenders := 0
+			for _, def := range potentialDefenders {
+				if def.Color == ColorBlue && def.Id != victim.Id {
+					defenders++
+				}
+			}
+
+			// Apply conversion
+			if defenders >= 3 {
+				// Defense success: Convert attacker
+				if pid := w.pidsCache[attacker.Id]; pid != nil {
+					ctx.Tell(pid, &Convert{TargetColor: ColorBlue})
+				}
+			} else {
+				// Defense failed: Convert victim
+				if pid := w.pidsCache[victim.Id]; pid != nil {
+					ctx.Tell(pid, &Convert{TargetColor: ColorRed})
+				}
+			}
+		}
+	}
+}
+
+func (w *WorldActor) buildSnapshot() *WorldSnapshot {
+	snapshot := &WorldSnapshot{
+		Actors:    make([]*ActorState, 0, len(w.actors)),
+		RedCount:  0,
+		BlueCount: 0,
+	}
+
+	for _, state := range w.actors {
+		snapshot.Actors = append(snapshot.Actors, state)
+		if state.Color == ColorRed {
+			snapshot.RedCount++
+		} else {
+			snapshot.BlueCount++
+		}
+	}
+
+	totalPopulation := snapshot.RedCount + snapshot.BlueCount
+	if totalPopulation > 0 {
+		if snapshot.RedCount == 0 {
+			snapshot.IsGameOver = true
+			snapshot.Winner = ColorBlue
+		} else if snapshot.BlueCount == 0 {
+			snapshot.IsGameOver = true
+			snapshot.Winner = ColorRed
+		}
+	}
+
+	return snapshot
 }
 
 func distSquared(a, b *ActorState) float64 {
@@ -304,4 +310,37 @@ func distSquared(a, b *ActorState) float64 {
 func (w *WorldActor) PostStop(ctx *actor.Context) error {
 	ctx.ActorSystem().Logger().Info("World is shutdown...")
 	return nil
+}
+
+// getActorsInRadius returns actors within a specific radius of (x, y)
+// More efficient than getNearbyActors when radius << cellSize
+func (w *WorldActor) getActorsInRadius(x, y, radius float64) []*ActorState {
+	radiusSq := radius * radius
+	cellSize := w.getCellSize()
+
+	// Calculate grid bounds that could contain actors within radius
+	minGx := int((x - radius) / cellSize)
+	maxGx := int((x + radius) / cellSize)
+	minGy := int((y - radius) / cellSize)
+	maxGy := int((y + radius) / cellSize)
+
+	var result []*ActorState
+
+	// Only scan necessary cells
+	for gx := minGx; gx <= maxGx; gx++ {
+		for gy := minGy; gy <= maxGy; gy++ {
+			key := gridKey{x: gx, y: gy}
+			if actors, ok := w.grid[key]; ok {
+				for _, a := range actors {
+					dx := a.PositionX - x
+					dy := a.PositionY - y
+					if dx*dx+dy*dy < radiusSq {
+						result = append(result, a)
+					}
+				}
+			}
+		}
+	}
+
+	return result
 }
