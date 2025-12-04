@@ -110,7 +110,6 @@ func (g *Game) Update() error {
 
 func (g *Game) Draw(screen *ebiten.Image) {
 	// 1. Draw all actors from the last known snapshot
-	// 1. Draw all actors from the last known snapshot
 	if g.lastState != nil {
 		for _, entity := range g.lastState.Actors {
 			var clr color.Color

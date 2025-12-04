@@ -6,6 +6,7 @@ import (
 	"math/rand/v2"
 	"time"
 
+	"github.com/lao-tseu-is-alive/go-swarm-simulation/pkg/geometry"
 	"github.com/tochemey/goakt/v3/actor"
 	"github.com/tochemey/goakt/v3/goaktpb"
 )
@@ -16,13 +17,13 @@ type gridKey struct {
 
 // WorldActor is the new "Brain." It manages the authoritative state and the spatial grid optimization.
 type WorldActor struct {
-	actors    map[string]*ActorState
+	entities  map[string]*Entity
 	pids      []*actor.PID // Keep track of children
 	pidsCache map[string]*actor.PID
 	uiChannel chan<- *WorldSnapshot
 	// Optimization: Spatial Hashing
-	// Map gridKey -> list of actors in that cell
-	grid map[gridKey][]*ActorState
+	// Map gridKey -> list of entities in that cell
+	grid map[gridKey][]*Entity
 	// Communication with UI
 	snapshotCh chan<- *WorldSnapshot
 	// Game Settings (received from UI)
@@ -39,9 +40,9 @@ type WorldActor struct {
 // NewWorldActor creates the world logic unit
 func NewWorldActor(snapshotCh chan<- *WorldSnapshot, cfg *Config) *WorldActor {
 	return &WorldActor{
-		actors:          make(map[string]*ActorState),
+		entities:        make(map[string]*Entity),
 		pidsCache:       make(map[string]*actor.PID),
-		grid:            make(map[gridKey][]*ActorState),
+		grid:            make(map[gridKey][]*Entity),
 		snapshotCh:      snapshotCh,
 		cfg:             cfg,
 		detectionRadius: cfg.DetectionRadius,
@@ -74,7 +75,7 @@ func (w *WorldActor) Receive(ctx *actor.ReceiveContext) {
 	// You might need to add this message to your Proto or use a wrapper
 	case *ActorState:
 		w.msgRecvCount++
-		w.actors[msg.Id] = msg
+		w.entities[msg.Id] = FromProto(msg)
 
 	// 2. The Main Simulation Step (Driven by Game Loop)
 	case *Tick:
@@ -99,7 +100,7 @@ func (w *WorldActor) logBenchmarks(ctx *actor.ReceiveContext) {
 	if time.Since(w.lastLogTime) >= time.Second {
 		total := w.msgSentCount + w.msgRecvCount
 		ctx.Logger().Infof("📊 MSG RATE: %d/sec (Sent: %d, Recv: %d) | Actors: %d",
-			total, w.msgSentCount, w.msgRecvCount, len(w.actors))
+			total, w.msgSentCount, w.msgRecvCount, len(w.entities))
 		w.msgSentCount = 0
 		w.msgRecvCount = 0
 		w.lastLogTime = time.Now()
@@ -128,7 +129,7 @@ func (w *WorldActor) broadcastSimulationStep(ctx *actor.ReceiveContext, dt int64
 		contactSq:    w.cfg.ContactRadius * w.cfg.ContactRadius,
 	}
 
-	for id, me := range w.actors {
+	for id, me := range w.entities {
 		// 1. Scan grid for neighbors (Perception + Combat triggers)
 		enemies, friends := w.scanNeighbors(ctx, me, ranges)
 
@@ -151,12 +152,12 @@ func (w *WorldActor) broadcastSimulationStep(ctx *actor.ReceiveContext, dt int64
 
 // scanNeighbors iterates the spatial grid around 'me'.
 // It populates perception lists AND handles combat interactions inline for efficiency.
-func (w *WorldActor) scanNeighbors(ctx *actor.ReceiveContext, me *ActorState, ranges struct{ perceptionSq, detectionSq, contactSq float64 }) ([]*ActorState, []*ActorState) {
+func (w *WorldActor) scanNeighbors(ctx *actor.ReceiveContext, me *Entity, ranges struct{ perceptionSq, detectionSq, contactSq float64 }) ([]*ActorState, []*ActorState) {
 	var visibleEnemies []*ActorState
 	var visibleFriends []*ActorState
 
 	// Get grid bounds for the largest relevant radius (usually Detection or Perception)
-	gx, gy := w.getCellIndices(me.PositionX, me.PositionY)
+	gx, gy := w.getCellIndices(me.Pos.X, me.Pos.Y)
 
 	// Iterate 3x3 Grid
 	for i := gx - 1; i <= gx+1; i++ {
@@ -168,22 +169,22 @@ func (w *WorldActor) scanNeighbors(ctx *actor.ReceiveContext, me *ActorState, ra
 			}
 
 			for _, other := range actorsInCell {
-				if other.Id == me.Id {
+				if other.ID == me.ID {
 					continue
 				}
 
-				distSq := distSquared(me, other)
+				distSq := me.DistanceSquaredTo(other)
 
 				// --- Logic Branching ---
 				if other.Color == me.Color {
 					// Friend Logic: Flocking
 					if distSq < ranges.perceptionSq {
-						visibleFriends = append(visibleFriends, other)
+						visibleFriends = append(visibleFriends, other.ToProto())
 					}
 				} else {
 					// Enemy Logic: Detection
 					if distSq < ranges.detectionSq {
-						visibleEnemies = append(visibleEnemies, other)
+						visibleEnemies = append(visibleEnemies, other.ToProto())
 					}
 
 					// Combat Logic: Red attacks Blue
@@ -201,22 +202,21 @@ func (w *WorldActor) scanNeighbors(ctx *actor.ReceiveContext, me *ActorState, ra
 }
 
 // resolveCombat handles the specific rules of engagement
-func (w *WorldActor) resolveCombat(ctx *actor.ReceiveContext, attacker, victim *ActorState) {
+func (w *WorldActor) resolveCombat(ctx *actor.ReceiveContext, attacker, victim *Entity) {
 	// Optimization: Use the allocation-free counter we built previously
 	defenders := w.countFriendsInRadius(
-		victim.PositionX,
-		victim.PositionY,
+		victim.Pos,
 		w.defenseRadius,
 		TeamColor_TEAM_BLUE, // Target is Blue defenders
-		victim.Id,           // Exclude the victim themselves
+		victim.ID,           // Exclude the victim themselves
 	)
 
 	if defenders >= 3 {
 		// Defense Success: Attacker converts to Blue
-		w.sendConvert(ctx, attacker.Id, TeamColor_TEAM_BLUE)
+		w.sendConvert(ctx, attacker.ID, TeamColor_TEAM_BLUE)
 	} else {
 		// Defense Failed: Victim converts to Red
-		w.sendConvert(ctx, victim.Id, TeamColor_TEAM_RED)
+		w.sendConvert(ctx, victim.ID, TeamColor_TEAM_RED)
 	}
 }
 
@@ -260,13 +260,17 @@ func (w *WorldActor) spawnSwarm(ctx *actor.ReceiveContext) {
 
 		// We must insert the actor into the map NOW, so the very first Tick loop
 		// sees it and sends it a message.
-		w.actors[name] = &ActorState{
-			Id:        name,
-			Color:     TeamColor_TEAM_RED,
-			PositionX: startX,
-			PositionY: startY,
-			VelocityX: vx,
-			VelocityY: vy,
+		w.entities[name] = &Entity{
+			ID:    name,
+			Color: TeamColor_TEAM_RED,
+			Pos: geometry.Vector2D{
+				X: startX,
+				Y: startY,
+			},
+			Vel: geometry.Vector2D{
+				X: vx,
+				Y: vy,
+			},
 		}
 	}
 
@@ -290,13 +294,17 @@ func (w *WorldActor) spawnSwarm(ctx *actor.ReceiveContext) {
 		w.pids = append(w.pids, pid)
 		w.pidsCache[name] = pid
 
-		w.actors[name] = &ActorState{
-			Id:        name,
-			Color:     TeamColor_TEAM_BLUE,
-			PositionX: startX,
-			PositionY: startY,
-			VelocityX: vx,
-			VelocityY: vy,
+		w.entities[name] = &Entity{
+			ID:    name,
+			Color: TeamColor_TEAM_BLUE,
+			Pos: geometry.Vector2D{
+				X: startX,
+				Y: startY,
+			},
+			Vel: geometry.Vector2D{
+				X: vx,
+				Y: vy,
+			},
 		}
 	}
 }
@@ -310,8 +318,8 @@ func (w *WorldActor) rebuildGrid() {
 	}
 
 	cellSize := w.getCellSize()
-	for _, a := range w.actors {
-		gx, gy := int(a.PositionX/cellSize), int(a.PositionY/cellSize)
+	for _, a := range w.entities {
+		gx, gy := int(a.Pos.X/cellSize), int(a.Pos.Y/cellSize)
 		key := gridKey{x: gx, y: gy}
 
 		// append will reuse the existing array capacity if available
@@ -332,10 +340,10 @@ func (w *WorldActor) getCellIndices(x, y float64) (int, int) {
 	return int(x / cs), int(y / cs)
 }
 
-// getNearbyActors retrieves all the actors in grids located in and around x,y  (3x3 Grid)
-func (w *WorldActor) getNearbyActors(x, y float64) []*ActorState {
+// getNearbyActors retrieves all the entities in grids located in and around x,y  (3x3 Grid)
+func (w *WorldActor) getNearbyActors(x, y float64) []*Entity {
 	gx, gy := w.getCellIndices(x, y)
-	var neighbors []*ActorState
+	var neighbors []*Entity
 
 	// Loop through X-1 to X+1 and Y-1 to Y+1
 	for i := gx - 1; i <= gx+1; i++ {
@@ -354,32 +362,32 @@ func (w *WorldActor) sendPerceptionUpdates(ctx *actor.ReceiveContext) {
 	perceptionSq := w.visualRange * w.visualRange
 	detectionSq := w.detectionRadius * w.detectionRadius
 
-	for _, actorRef := range w.actors {
-		nearby := w.getNearbyActors(actorRef.PositionX, actorRef.PositionY)
+	for _, entity := range w.entities {
+		nearby := w.getNearbyActors(entity.Pos.X, entity.Pos.Y)
 
 		var visibleEnemies []*ActorState
 		var visibleFriends []*ActorState
 
 		for _, other := range nearby {
-			if other.Id == actorRef.Id {
+			if other.ID == entity.ID {
 				continue
 			}
 
-			distSq := distSquared(actorRef, other)
+			distSq := entity.DistanceSquaredTo(other)
 
-			if other.Color == actorRef.Color {
+			if other.Color == entity.Color {
 				if distSq < perceptionSq {
-					visibleFriends = append(visibleFriends, other)
+					visibleFriends = append(visibleFriends, other.ToProto())
 				}
 			} else {
 				if distSq < detectionSq {
-					visibleEnemies = append(visibleEnemies, other)
+					visibleEnemies = append(visibleEnemies, other.ToProto())
 				}
 			}
 		}
 
 		// Send fresh perception BEFORE they move
-		if pid, ok := w.pidsCache[actorRef.Id]; ok {
+		if pid, ok := w.pidsCache[entity.ID]; ok {
 			w.msgSentCount++ // COUNT PERCEPTION MSG
 			ctx.Tell(pid, &Perception{
 				Targets: visibleEnemies,
@@ -393,43 +401,42 @@ func (w *WorldActor) sendPerceptionUpdates(ctx *actor.ReceiveContext) {
 func (w *WorldActor) processInteractions(ctx *actor.ReceiveContext) {
 	contactSq := w.cfg.ContactRadius * w.cfg.ContactRadius
 
-	// Only iterate Red actors to avoid double-processing
-	for _, attacker := range w.actors {
+	// Only iterate Red entities to avoid double-processing
+	for _, attacker := range w.entities {
 		if attacker.Color != TeamColor_TEAM_RED {
 			continue // Skip Blues
 		}
 
-		nearby := w.getNearbyActors(attacker.PositionX, attacker.PositionY)
+		nearby := w.getNearbyActors(attacker.Pos.X, attacker.Pos.Y)
 
 		for _, victim := range nearby {
 			if victim.Color != TeamColor_TEAM_BLUE {
 				continue // Only attack Blues
 			}
 
-			distSq := distSquared(attacker, victim)
+			distSq := attacker.DistanceSquaredTo(victim)
 			if distSq >= contactSq {
 				continue // Too far for combat
 			}
 
 			// === COMBAT LOGIC ===
 			defenders := w.countFriendsInRadius(
-				victim.PositionX,
-				victim.PositionY,
+				victim.Pos,
 				w.defenseRadius,
 				TeamColor_TEAM_BLUE,
-				victim.Id,
+				victim.ID,
 			)
 
 			// Apply conversion
 			if defenders >= 3 {
 				// Defense success: Convert attacker
-				if pid := w.pidsCache[attacker.Id]; pid != nil {
+				if pid := w.pidsCache[attacker.ID]; pid != nil {
 					w.msgSentCount++ // <--- COUNT CONVERT MSG
 					ctx.Tell(pid, &Convert{TargetColor: TeamColor_TEAM_BLUE})
 				}
 			} else {
 				// Defense failed: Convert victim
-				if pid := w.pidsCache[victim.Id]; pid != nil {
+				if pid := w.pidsCache[victim.ID]; pid != nil {
 					w.msgSentCount++ // <--- COUNT CONVERT MSG
 					ctx.Tell(pid, &Convert{TargetColor: TeamColor_TEAM_RED})
 				}
@@ -440,13 +447,13 @@ func (w *WorldActor) processInteractions(ctx *actor.ReceiveContext) {
 
 func (w *WorldActor) buildSnapshot() *WorldSnapshot {
 	snapshot := &WorldSnapshot{
-		Actors:    make([]*ActorState, 0, len(w.actors)),
+		Actors:    make([]*ActorState, 0, len(w.entities)),
 		RedCount:  0,
 		BlueCount: 0,
 	}
 
-	for _, state := range w.actors {
-		snapshot.Actors = append(snapshot.Actors, state)
+	for _, state := range w.entities {
+		snapshot.Actors = append(snapshot.Actors, state.ToProto())
 		if state.Color == TeamColor_TEAM_RED {
 			snapshot.RedCount++
 		} else {
@@ -468,45 +475,37 @@ func (w *WorldActor) buildSnapshot() *WorldSnapshot {
 	return snapshot
 }
 
-func distSquared(a, b *ActorState) float64 {
-	dx := a.PositionX - b.PositionX
-	dy := a.PositionY - b.PositionY
-	return dx*dx + dy*dy
-}
-
 func (w *WorldActor) PostStop(ctx *actor.Context) error {
 	ctx.ActorSystem().Logger().Info("World is shutdown...")
 	return nil
 }
 
-// countFriendsInRadius returns the count of actors of 'targetColor' within 'radius', excluding 'excludeID'.
+// countFriendsInRadius returns the count of entities of 'targetColor' within 'radius', excluding 'excludeID'.
 // It performs 0 allocations.
-func (w *WorldActor) countFriendsInRadius(x, y, radius float64, targetColor TeamColor, excludeID string) int {
+func (w *WorldActor) countFriendsInRadius(center geometry.Vector2D, radius float64, targetColor TeamColor, excludeID string) int {
 	radiusSq := radius * radius
 	cellSize := w.getCellSize()
 
 	// Calculate grid bounds
-	minGx := int((x - radius) / cellSize)
-	maxGx := int((x + radius) / cellSize)
-	minGy := int((y - radius) / cellSize)
-	maxGy := int((y + radius) / cellSize)
+	minGx := int((center.X - radius) / cellSize)
+	maxGx := int((center.X + radius) / cellSize)
+	minGy := int((center.Y - radius) / cellSize)
+	maxGy := int((center.Y + radius) / cellSize)
 
 	count := 0
 
 	for gx := minGx; gx <= maxGx; gx++ {
 		for gy := minGy; gy <= maxGy; gy++ {
 			key := gridKey{x: gx, y: gy}
-			if actors, ok := w.grid[key]; ok {
-				for _, a := range actors {
+			if entities, ok := w.grid[key]; ok {
+				for _, e := range entities {
 					// 1. Check ID and Color FIRST (cheaper than math)
-					if a.Color != targetColor || a.Id == excludeID {
+					if e.Color != targetColor || e.ID == excludeID {
 						continue
 					}
 
 					// 2. Check Distance
-					dx := a.PositionX - x
-					dy := a.PositionY - y
-					if dx*dx+dy*dy < radiusSq {
+					if e.Pos.DistanceSquaredTo(center) < radiusSq {
 						count++
 					}
 				}
@@ -516,11 +515,15 @@ func (w *WorldActor) countFriendsInRadius(x, y, radius float64, targetColor Team
 	return count
 }
 
-// getActorsInRadius returns actors within a specific radius of (x, y)
+// getActorsInRadius returns entities within a specific radius of (x, y)
 // More efficient than getNearbyActors when radius << cellSize
-func (w *WorldActor) getBlueActorsInRadius(x, y, radius float64) []*ActorState {
+func (w *WorldActor) getBlueActorsInRadius(x, y, radius float64) []*Entity {
 	radiusSq := radius * radius
 	cellSize := w.getCellSize()
+	center := geometry.Vector2D{
+		X: x,
+		Y: y,
+	}
 
 	// Calculate grid bounds that could contain actors within radius
 	minGx := int((x - radius) / cellSize)
@@ -528,18 +531,16 @@ func (w *WorldActor) getBlueActorsInRadius(x, y, radius float64) []*ActorState {
 	minGy := int((y - radius) / cellSize)
 	maxGy := int((y + radius) / cellSize)
 
-	var result []*ActorState
+	var result []*Entity
 
 	// Only scan necessary cells
 	for gx := minGx; gx <= maxGx; gx++ {
 		for gy := minGy; gy <= maxGy; gy++ {
 			key := gridKey{x: gx, y: gy}
-			if actors, ok := w.grid[key]; ok {
-				for _, a := range actors {
-					dx := a.PositionX - x
-					dy := a.PositionY - y
-					if dx*dx+dy*dy < radiusSq {
-						result = append(result, a)
+			if entities, ok := w.grid[key]; ok {
+				for _, e := range entities {
+					if e.Pos.DistanceSquaredTo(center) < radiusSq {
+						result = append(result, e)
 					}
 				}
 			}
