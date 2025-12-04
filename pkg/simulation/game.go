@@ -14,17 +14,13 @@ import (
 )
 
 type Game struct {
-	System actor.ActorSystem
-	ctx    context.Context
-
-	// The World Actor Reference
-	worldPID *actor.PID
-
-	// Data from World
+	ctx        context.Context
+	System     actor.ActorSystem
+	worldPID   *actor.PID
 	snapshotCh chan *WorldSnapshot
 	lastState  *WorldSnapshot
 
-	// UI Sliders
+	// UI Controls
 	sliderDetection *Slider
 	sliderDefense   *Slider
 
@@ -32,30 +28,26 @@ type Game struct {
 }
 
 func GetNewGame(ctx context.Context, cfg *Config, system actor.ActorSystem) *Game {
-	// 1. System is now passed in
-	// system, _ := actor.NewActorSystem(...) // Removed
+	// 1. Create Channels for communication
+	snapshotCh := make(chan *WorldSnapshot, 10) // Buffer to avoid blocking
 
-	// 2. Create the channel for World -> UI communication
-	snapshotCh := make(chan *WorldSnapshot, 10)
-
-	// 3. SPAWN THE WORLD ACTOR
-	// Note: We pass the settings so the World can spawn the individuals
+	// 2. Spawn World Actor
+	// We pass the channel to the World so it can push updates to us.
+	// Note: NewWorldActor signature is (snapshotCh, cfg)
 	worldActor := NewWorldActor(snapshotCh, cfg)
-	worldPID, _ := system.Spawn(ctx, "World", worldActor)
+	worldPID, err := system.Spawn(ctx, "world", worldActor)
+	if err != nil {
+		panic(fmt.Sprintf("Failed to spawn world: %v", err))
+	}
 
-	// 4. Initialize Sliders (UI only)
-	sDetection := &Slider{
-		Label: "Detection", Value: cfg.DetectionRadius,
-		Min: 0, Max: 100, X: 10, Y: 20, W: 200, H: 20,
-	}
-	sDefense := &Slider{
-		Label: "Defense", Value: cfg.DefenseRadius,
-		Min: 0, Max: 100, X: 10, Y: 70, W: 200, H: 20,
-	}
+	// 3. Initialize Sliders
+	// Position them at the top left or wherever you like
+	sDetection := NewSlider(10, 20, 200, "Detection Radius", 0, 200, cfg.DetectionRadius)
+	sDefense := NewSlider(10, 70, 200, "Defense Radius", 0, 200, cfg.DefenseRadius)
 
 	return &Game{
-		System:     system,
 		ctx:        ctx,
+		System:     system,
 		worldPID:   worldPID,
 		snapshotCh: snapshotCh,
 		lastState: &WorldSnapshot{
@@ -91,14 +83,21 @@ func (g *Game) Update() error {
 	if !g.lastState.IsGameOver {
 		// 3. Send Updated Config to World (Fire and Forget)
 		// Only send if changed (optimization omitted for brevity)
-		g.System.NoSender().Tell(g.ctx, g.worldPID, &UpdateConfig{
+		// In goakt, Tell is a method on the PID or Context?
+		// Usually: ctx.Tell(pid, msg) or actor.Tell(ctx, pid, msg)
+		// Looking at goakt docs or usage: system.Tell(ctx, pid, msg) isn't standard?
+		// Usually we use the context we have.
+		// Wait, main.go passes a context.
+		// Let's check how to send messages from outside an actor in goakt.
+		// Usually: actor.Tell(ctx, pid, message)
+		actor.Tell(g.ctx, g.worldPID, &UpdateConfig{
 			DetectionRadius: g.sliderDetection.Value,
 			DefenseRadius:   g.sliderDefense.Value,
 		})
 
 		// 4. Trigger Simulation Step
 		// We tell the World: "It's time to process a frame"
-		g.System.NoSender().Tell(g.ctx, g.worldPID, &Tick{})
+		actor.Tell(g.ctx, g.worldPID, &Tick{})
 	}
 
 	return nil
@@ -112,15 +111,17 @@ func (g *Game) Draw(screen *ebiten.Image) {
 			var clr color.Color
 			if entity.Color == TeamColor_TEAM_RED {
 				clr = color.RGBA{R: 255, G: 50, B: 50, A: 255}
-				vector.StrokeCircle(
-					screen,
-					float32(entity.Position.X),
-					float32(entity.Position.Y),
-					float32(g.sliderDetection.Value),
-					1,
-					clr,
-					true,
-				)
+				if g.cfg.DisplayDetectionCircle {
+					vector.StrokeCircle(
+						screen,
+						float32(entity.Position.X),
+						float32(entity.Position.Y),
+						float32(g.sliderDetection.Value),
+						1,
+						clr,
+						true,
+					)
+				}
 				vector.FillCircle(
 					screen,
 					float32(entity.Position.X),
@@ -134,16 +135,18 @@ func (g *Game) Draw(screen *ebiten.Image) {
 				drawBoid(screen, entity)
 
 				// Optional: Draw Defense Radius ring if you want to see it
-				clr = color.RGBA{R: 50, G: 100, B: 255, A: 50} // Transparent blue
-				vector.StrokeCircle(
-					screen,
-					float32(entity.Position.X),
-					float32(entity.Position.Y),
-					float32(g.sliderDefense.Value),
-					1,
-					clr,
-					true,
-				)
+				if g.cfg.DisplayDefenseCircle {
+					clr = color.RGBA{R: 50, G: 100, B: 255, A: 50} // Transparent blue
+					vector.StrokeCircle(
+						screen,
+						float32(entity.Position.X),
+						float32(entity.Position.Y),
+						float32(g.sliderDefense.Value),
+						1,
+						clr,
+						true,
+					)
+				}
 			}
 		}
 	}

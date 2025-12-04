@@ -6,6 +6,7 @@ require (
 	github.com/hajimehoshi/ebiten/v2 v2.9.4
 	github.com/santhosh-tekuri/jsonschema/v5 v5.3.1
 	github.com/tochemey/goakt/v3 v3.9.9
+	go.uber.org/zap v1.27.1
 	google.golang.org/protobuf v1.36.10
 )
 
@@ -55,7 +56,6 @@ require (
 	go.etcd.io/bbolt v1.4.3 // indirect
 	go.uber.org/atomic v1.11.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
-	go.uber.org/zap v1.27.1 // indirect
 	golang.org/x/mod v0.30.0 // indirect
 	golang.org/x/net v0.47.0 // indirect
 	golang.org/x/sync v0.18.0 // indirect

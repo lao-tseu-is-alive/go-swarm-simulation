@@ -83,6 +83,24 @@
       "type": "number",
       "minimum": 0,
       "description": "Minimum speed a Blue actor tries to maintain."
+    },
+    "logLevel": {
+      "type": "string",
+      "enum": ["debug", "info", "warn", "error"],
+      "description": "Logging level."
+    },
+    "logFormat": {
+      "type": "string",
+      "enum": ["json", "text"],
+      "description": "Logging format."
+    },
+    "displayDetectionCircle": {
+      "type": "boolean",
+      "description": "Toggle drawing of detection radius for Red actors."
+    },
+    "displayDefenseCircle": {
+      "type": "boolean",
+      "description": "Toggle drawing of defense radius for Blue actors."
     }
   },
   "required": [
@@ -101,6 +119,10 @@
     "avoidFactor",
     "matchingFactor",
     "turnFactor",
-    "minSpeed"
+    "minSpeed",
+    "logLevel",
+    "logFormat",
+    "displayDetectionCircle",
+    "displayDefenseCircle"
   ]
 }

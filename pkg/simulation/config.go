@@ -58,28 +58,36 @@ type Config struct {
 	LogLevel string `json:"logLevel"`
 	// LogFormat sets the logging format (json, text). Default: json
 	LogFormat string `json:"logFormat"`
+
+	// Debug Visualization
+	// DisplayDetectionCircle toggles the drawing of the detection radius for Red actors.
+	DisplayDetectionCircle bool `json:"displayDetectionCircle"`
+	// DisplayDefenseCircle toggles the drawing of the defense radius for Blue actors.
+	DisplayDefenseCircle bool `json:"displayDefenseCircle"`
 }
 
 func DefaultConfig() *Config {
 	return &Config{
-		WorldWidth:      1000,
-		WorldHeight:     800,
-		NumRedAtStart:   5,
-		NumBlueAtStart:  30,
-		DetectionRadius: 50,
-		DefenseRadius:   40,
-		ContactRadius:   12,
-		VisualRange:     70.0,
-		ProtectedRange:  20.0,
-		CenteringFactor: 0.0005,
-		AvoidFactor:     0.05,
-		MatchingFactor:  0.05,
-		TurnFactor:      0.2,
-		MaxSpeed:        4.0,
-		MinSpeed:        2.0,
-		Aggression:      0.8,
-		LogLevel:        "info",
-		LogFormat:       "json",
+		WorldWidth:             1000,
+		WorldHeight:            800,
+		NumRedAtStart:          5,
+		NumBlueAtStart:         30,
+		DetectionRadius:        50,
+		DefenseRadius:          40,
+		ContactRadius:          12,
+		VisualRange:            70.0,
+		ProtectedRange:         20.0,
+		CenteringFactor:        0.0005,
+		AvoidFactor:            0.05,
+		MatchingFactor:         0.05,
+		TurnFactor:             0.2,
+		MaxSpeed:               4.0,
+		MinSpeed:               2.0,
+		Aggression:             0.8,
+		LogLevel:               "info",
+		LogFormat:              "json",
+		DisplayDetectionCircle: false,
+		DisplayDefenseCircle:   false,
 	}
 }
 

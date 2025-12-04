@@ -16,6 +16,20 @@ type Slider struct {
 	W, H     float64
 }
 
+// NewSlider creates a new slider instance
+func NewSlider(x, y, w float64, label string, min, max, value float64) *Slider {
+	return &Slider{
+		Label: label,
+		Value: value,
+		Min:   min,
+		Max:   max,
+		X:     x,
+		Y:     y,
+		W:     w,
+		H:     20, // Default height
+	}
+}
+
 // Update checks for mouse interaction
 func (s *Slider) Update() {
 	mx, my := ebiten.CursorPosition()
