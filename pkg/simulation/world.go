@@ -75,7 +75,12 @@ func (w *WorldActor) Receive(ctx *actor.ReceiveContext) {
 	// You might need to add this message to your Proto or use a wrapper
 	case *ActorState:
 		w.msgRecvCount++
-		w.entities[msg.Id] = FromProto(msg)
+		if existing, ok := w.entities[msg.Id]; ok {
+			existing.UpdateFromProto(msg)
+		} else {
+			// Only allocate if it's a new actor
+			w.entities[msg.Id] = FromProto(msg)
+		}
 
 	// 2. The Main Simulation Step (Driven by Game Loop)
 	case *Tick:

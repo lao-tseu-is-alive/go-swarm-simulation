@@ -40,6 +40,19 @@ func (e *Entity) ToProto() *ActorState {
 	}
 }
 
+// UpdateFromProto updates the entity's state from a Protobuf message
+// without allocating new memory.
+func (e *Entity) UpdateFromProto(p *ActorState) {
+	// We assume ID and Color don't change often, but Position/Velocity do.
+	e.Pos.X = p.PositionX
+	e.Pos.Y = p.PositionY
+	e.Vel.X = p.VelocityX
+	e.Vel.Y = p.VelocityY
+
+	// Optional: Sync color if dynamic conversion happens outside the world
+	e.Color = p.Color
+}
+
 // FromProto (if needed) converts incoming messages back to Entities
 func FromProto(p *ActorState) *Entity {
 	return &Entity{
