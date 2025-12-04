@@ -9,7 +9,10 @@ message Tick {
   int64 delta_time = 1; // Time elapsed since last frame
   Perception context = 2; // Optional field
 }
-
+message Vector  {
+  double x = 1;
+  double y = 2;
+}
 enum TeamColor {
   TEAM_UNSPECIFIED = 0;
   TEAM_RED = 1;
@@ -23,10 +26,8 @@ message GetState {}
 message ActorState {
   string id = 1;
   TeamColor color = 2; // "RED" or "BLUE"
-  double position_x = 3;
-  double position_y = 4;
-  double velocity_x = 5;
-  double velocity_y = 6;
+  Vector position = 3;
+  Vector velocity = 4;
 }
 // Perception is sent by the world to tell an actor what neighbors are visible
 message Perception {

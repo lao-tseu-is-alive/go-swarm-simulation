@@ -109,6 +109,7 @@ func (g *Game) Update() error {
 }
 
 func (g *Game) Draw(screen *ebiten.Image) {
+
 	// 1. Draw all actors from the last known snapshot
 	if g.lastState != nil {
 		for _, entity := range g.lastState.Actors {
@@ -117,8 +118,8 @@ func (g *Game) Draw(screen *ebiten.Image) {
 				clr = color.RGBA{R: 255, G: 50, B: 50, A: 255}
 				vector.StrokeCircle(
 					screen,
-					float32(entity.PositionX),
-					float32(entity.PositionY),
+					float32(entity.Position.X),
+					float32(entity.Position.Y),
 					float32(g.sliderDetection.Value),
 					1,
 					clr,
@@ -126,8 +127,8 @@ func (g *Game) Draw(screen *ebiten.Image) {
 				)
 				vector.FillCircle(
 					screen,
-					float32(entity.PositionX),
-					float32(entity.PositionY),
+					float32(entity.Position.X),
+					float32(entity.Position.Y),
 					6,
 					clr,
 					true,
@@ -140,8 +141,8 @@ func (g *Game) Draw(screen *ebiten.Image) {
 				clr = color.RGBA{R: 50, G: 100, B: 255, A: 50} // Transparent blue
 				vector.StrokeCircle(
 					screen,
-					float32(entity.PositionX),
-					float32(entity.PositionY),
+					float32(entity.Position.X),
+					float32(entity.Position.Y),
 					float32(g.sliderDefense.Value),
 					1,
 					clr,
@@ -234,15 +235,15 @@ func init() {
 }
 
 func drawBoid(screen *ebiten.Image, b *ActorState) {
-	angle := math.Atan2(b.VelocityY, b.VelocityX)
+	angle := math.Atan2(b.Velocity.Y, b.Velocity.X)
 
 	// Visual geometry logic
-	tipX := b.PositionX + math.Cos(angle)*6
-	tipY := b.PositionY + math.Sin(angle)*6
-	rightX := b.PositionX + math.Cos(angle+2.5)*5
-	rightY := b.PositionY + math.Sin(angle+2.5)*5
-	leftX := b.PositionX + math.Cos(angle-2.5)*5
-	leftY := b.PositionY + math.Sin(angle-2.5)*5
+	tipX := b.Position.X + math.Cos(angle)*6
+	tipY := b.Position.Y + math.Sin(angle)*6
+	rightX := b.Position.X + math.Cos(angle+2.5)*5
+	rightY := b.Position.Y + math.Sin(angle+2.5)*5
+	leftX := b.Position.X + math.Cos(angle-2.5)*5
+	leftY := b.Position.Y + math.Sin(angle-2.5)*5
 
 	// Define the 3 vertices of the triangle
 	vertices := []ebiten.Vertex{

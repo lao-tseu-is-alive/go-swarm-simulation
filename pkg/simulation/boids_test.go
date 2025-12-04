@@ -2,6 +2,8 @@ package simulation
 
 import (
 	"testing"
+
+	"github.com/lao-tseu-is-alive/go-swarm-simulation/pkg/geometry"
 )
 
 func TestComputeBoidUpdate_Separation(t *testing.T) {
@@ -14,15 +16,26 @@ func TestComputeBoidUpdate_Separation(t *testing.T) {
 		CenteringFactor: 0.0,
 		MatchingFactor:  0.0,
 	}
-	me := &Individual{X: 0, Y: 0, vx: 0, vy: 0}
+	me := &Entity{
+		ID:    "me",
+		Color: TeamColor_TEAM_BLUE,
+		Pos: geometry.Vector2D{
+			X: 0,
+			Y: 0,
+		},
+		Vel: geometry.Vector2D{
+			X: 0,
+			Y: 0,
+		},
+	}
 	friends := []*ActorState{
-		{PositionX: 1, PositionY: 0, VelocityX: 0, VelocityY: 0},
+		{Position: &Vector{X: 1, Y: 0}, Velocity: &Vector{X: 0, Y: 0}},
 	}
 
-	vx, _ := ComputeBoidUpdate(me, friends, cfg)
+	force := ComputeBoidUpdate(me, friends, cfg)
 
-	if vx >= 0 {
-		t.Errorf("Expected negative vx (separation), got %f", vx)
+	if force.X >= 0 {
+		t.Errorf("Expected negative vx (separation), got %f", force.X)
 	}
 }
 
@@ -36,15 +49,25 @@ func TestComputeBoidUpdate_Cohesion(t *testing.T) {
 		CenteringFactor: 0.1,
 		MatchingFactor:  0.0,
 	}
-	me := &Individual{X: 0, Y: 0, vx: 0, vy: 0}
+	me := &Entity{
+		ID:    "me",
+		Color: TeamColor_TEAM_BLUE,
+		Pos: geometry.Vector2D{
+			X: 0,
+			Y: 0,
+		},
+		Vel: geometry.Vector2D{
+			X: 0,
+			Y: 0,
+		},
+	}
 	friends := []*ActorState{
-		{PositionX: 5, PositionY: 0, VelocityX: 0, VelocityY: 0},
+		{Position: &Vector{X: 5, Y: 0}, Velocity: &Vector{X: 0, Y: 0}},
 	}
 
-	vx, _ := ComputeBoidUpdate(me, friends, cfg)
-
-	if vx <= 0 {
-		t.Errorf("Expected positive vx (cohesion), got %f", vx)
+	force := ComputeBoidUpdate(me, friends, cfg)
+	if force.X <= 0 {
+		t.Errorf("Expected positive vx (cohesion), got %f", force.X)
 	}
 }
 
@@ -58,14 +81,24 @@ func TestComputeBoidUpdate_Alignment(t *testing.T) {
 		CenteringFactor: 0.0,
 		MatchingFactor:  0.1,
 	}
-	me := &Individual{X: 0, Y: 0, vx: 0, vy: 0}
+	me := &Entity{
+		ID:    "me",
+		Color: TeamColor_TEAM_BLUE,
+		Pos: geometry.Vector2D{
+			X: 0,
+			Y: 0,
+		},
+		Vel: geometry.Vector2D{
+			X: 0,
+			Y: 0,
+		},
+	}
 	friends := []*ActorState{
-		{PositionX: 5, PositionY: 0, VelocityX: 1, VelocityY: 0},
+		{Position: &Vector{X: 5, Y: 0}, Velocity: &Vector{X: 1, Y: 0}},
 	}
 
-	vx, _ := ComputeBoidUpdate(me, friends, cfg)
-
-	if vx <= 0 {
-		t.Errorf("Expected positive vx (alignment), got %f", vx)
+	force := ComputeBoidUpdate(me, friends, cfg)
+	if force.X <= 0 {
+		t.Errorf("Expected positive vx (alignment), got %f", force.X)
 	}
 }

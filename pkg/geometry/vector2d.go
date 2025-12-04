@@ -17,8 +17,8 @@ const (
 // We use public fields (X, Y) because they are fundamental data, not internal state.
 // This is idiomatic in Go and allows for cleaner literal initialization: v := Vector2D{1, 2}
 type Vector2D struct {
-	X float64 `json:"x"`
-	Y float64 `json:"y"`
+	X float64 `json:"x" protobuf:"x,1"`
+	Y float64 `json:"y" protobuf:"y,1"`
 }
 
 // NewVector creates a new Vector2D.

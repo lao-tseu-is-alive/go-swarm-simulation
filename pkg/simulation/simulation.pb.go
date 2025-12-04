@@ -123,6 +123,58 @@ func (x *Tick) GetContext() *Perception {
 	return nil
 }
 
+type Vector struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	X             float64                `protobuf:"fixed64,1,opt,name=x,proto3" json:"x,omitempty"`
+	Y             float64                `protobuf:"fixed64,2,opt,name=y,proto3" json:"y,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Vector) Reset() {
+	*x = Vector{}
+	mi := &file_pb_simulation_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Vector) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Vector) ProtoMessage() {}
+
+func (x *Vector) ProtoReflect() protoreflect.Message {
+	mi := &file_pb_simulation_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Vector.ProtoReflect.Descriptor instead.
+func (*Vector) Descriptor() ([]byte, []int) {
+	return file_pb_simulation_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *Vector) GetX() float64 {
+	if x != nil {
+		return x.X
+	}
+	return 0
+}
+
+func (x *Vector) GetY() float64 {
+	if x != nil {
+		return x.Y
+	}
+	return 0
+}
+
 // Sent by the World to ask for current status
 type GetState struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -132,7 +184,7 @@ type GetState struct {
 
 func (x *GetState) Reset() {
 	*x = GetState{}
-	mi := &file_pb_simulation_proto_msgTypes[1]
+	mi := &file_pb_simulation_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -144,7 +196,7 @@ func (x *GetState) String() string {
 func (*GetState) ProtoMessage() {}
 
 func (x *GetState) ProtoReflect() protoreflect.Message {
-	mi := &file_pb_simulation_proto_msgTypes[1]
+	mi := &file_pb_simulation_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -157,7 +209,7 @@ func (x *GetState) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetState.ProtoReflect.Descriptor instead.
 func (*GetState) Descriptor() ([]byte, []int) {
-	return file_pb_simulation_proto_rawDescGZIP(), []int{1}
+	return file_pb_simulation_proto_rawDescGZIP(), []int{2}
 }
 
 // The response containing the actor's data
@@ -165,17 +217,15 @@ type ActorState struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	Color         TeamColor              `protobuf:"varint,2,opt,name=color,proto3,enum=pb.TeamColor" json:"color,omitempty"` // "RED" or "BLUE"
-	PositionX     float64                `protobuf:"fixed64,3,opt,name=position_x,json=positionX,proto3" json:"position_x,omitempty"`
-	PositionY     float64                `protobuf:"fixed64,4,opt,name=position_y,json=positionY,proto3" json:"position_y,omitempty"`
-	VelocityX     float64                `protobuf:"fixed64,5,opt,name=velocity_x,json=velocityX,proto3" json:"velocity_x,omitempty"`
-	VelocityY     float64                `protobuf:"fixed64,6,opt,name=velocity_y,json=velocityY,proto3" json:"velocity_y,omitempty"`
+	Position      *Vector                `protobuf:"bytes,3,opt,name=position,proto3" json:"position,omitempty"`
+	Velocity      *Vector                `protobuf:"bytes,4,opt,name=velocity,proto3" json:"velocity,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *ActorState) Reset() {
 	*x = ActorState{}
-	mi := &file_pb_simulation_proto_msgTypes[2]
+	mi := &file_pb_simulation_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -187,7 +237,7 @@ func (x *ActorState) String() string {
 func (*ActorState) ProtoMessage() {}
 
 func (x *ActorState) ProtoReflect() protoreflect.Message {
-	mi := &file_pb_simulation_proto_msgTypes[2]
+	mi := &file_pb_simulation_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -200,7 +250,7 @@ func (x *ActorState) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ActorState.ProtoReflect.Descriptor instead.
 func (*ActorState) Descriptor() ([]byte, []int) {
-	return file_pb_simulation_proto_rawDescGZIP(), []int{2}
+	return file_pb_simulation_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *ActorState) GetId() string {
@@ -217,32 +267,18 @@ func (x *ActorState) GetColor() TeamColor {
 	return TeamColor_TEAM_UNSPECIFIED
 }
 
-func (x *ActorState) GetPositionX() float64 {
+func (x *ActorState) GetPosition() *Vector {
 	if x != nil {
-		return x.PositionX
+		return x.Position
 	}
-	return 0
+	return nil
 }
 
-func (x *ActorState) GetPositionY() float64 {
+func (x *ActorState) GetVelocity() *Vector {
 	if x != nil {
-		return x.PositionY
+		return x.Velocity
 	}
-	return 0
-}
-
-func (x *ActorState) GetVelocityX() float64 {
-	if x != nil {
-		return x.VelocityX
-	}
-	return 0
-}
-
-func (x *ActorState) GetVelocityY() float64 {
-	if x != nil {
-		return x.VelocityY
-	}
-	return 0
+	return nil
 }
 
 // Perception is sent by the world to tell an actor what neighbors are visible
@@ -256,7 +292,7 @@ type Perception struct {
 
 func (x *Perception) Reset() {
 	*x = Perception{}
-	mi := &file_pb_simulation_proto_msgTypes[3]
+	mi := &file_pb_simulation_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -268,7 +304,7 @@ func (x *Perception) String() string {
 func (*Perception) ProtoMessage() {}
 
 func (x *Perception) ProtoReflect() protoreflect.Message {
-	mi := &file_pb_simulation_proto_msgTypes[3]
+	mi := &file_pb_simulation_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -281,7 +317,7 @@ func (x *Perception) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Perception.ProtoReflect.Descriptor instead.
 func (*Perception) Descriptor() ([]byte, []int) {
-	return file_pb_simulation_proto_rawDescGZIP(), []int{3}
+	return file_pb_simulation_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *Perception) GetTargets() []*ActorState {
@@ -308,7 +344,7 @@ type Convert struct {
 
 func (x *Convert) Reset() {
 	*x = Convert{}
-	mi := &file_pb_simulation_proto_msgTypes[4]
+	mi := &file_pb_simulation_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -320,7 +356,7 @@ func (x *Convert) String() string {
 func (*Convert) ProtoMessage() {}
 
 func (x *Convert) ProtoReflect() protoreflect.Message {
-	mi := &file_pb_simulation_proto_msgTypes[4]
+	mi := &file_pb_simulation_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -333,7 +369,7 @@ func (x *Convert) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Convert.ProtoReflect.Descriptor instead.
 func (*Convert) Descriptor() ([]byte, []int) {
-	return file_pb_simulation_proto_rawDescGZIP(), []int{4}
+	return file_pb_simulation_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *Convert) GetTargetColor() TeamColor {
@@ -353,7 +389,7 @@ type ReportStatus struct {
 
 func (x *ReportStatus) Reset() {
 	*x = ReportStatus{}
-	mi := &file_pb_simulation_proto_msgTypes[5]
+	mi := &file_pb_simulation_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -365,7 +401,7 @@ func (x *ReportStatus) String() string {
 func (*ReportStatus) ProtoMessage() {}
 
 func (x *ReportStatus) ProtoReflect() protoreflect.Message {
-	mi := &file_pb_simulation_proto_msgTypes[5]
+	mi := &file_pb_simulation_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -378,7 +414,7 @@ func (x *ReportStatus) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReportStatus.ProtoReflect.Descriptor instead.
 func (*ReportStatus) Descriptor() ([]byte, []int) {
-	return file_pb_simulation_proto_rawDescGZIP(), []int{5}
+	return file_pb_simulation_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *ReportStatus) GetState() *ActorState {
@@ -402,7 +438,7 @@ type WorldSnapshot struct {
 
 func (x *WorldSnapshot) Reset() {
 	*x = WorldSnapshot{}
-	mi := &file_pb_simulation_proto_msgTypes[6]
+	mi := &file_pb_simulation_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -414,7 +450,7 @@ func (x *WorldSnapshot) String() string {
 func (*WorldSnapshot) ProtoMessage() {}
 
 func (x *WorldSnapshot) ProtoReflect() protoreflect.Message {
-	mi := &file_pb_simulation_proto_msgTypes[6]
+	mi := &file_pb_simulation_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -427,7 +463,7 @@ func (x *WorldSnapshot) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WorldSnapshot.ProtoReflect.Descriptor instead.
 func (*WorldSnapshot) Descriptor() ([]byte, []int) {
-	return file_pb_simulation_proto_rawDescGZIP(), []int{6}
+	return file_pb_simulation_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *WorldSnapshot) GetActors() []*ActorState {
@@ -476,7 +512,7 @@ type UpdateConfig struct {
 
 func (x *UpdateConfig) Reset() {
 	*x = UpdateConfig{}
-	mi := &file_pb_simulation_proto_msgTypes[7]
+	mi := &file_pb_simulation_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -488,7 +524,7 @@ func (x *UpdateConfig) String() string {
 func (*UpdateConfig) ProtoMessage() {}
 
 func (x *UpdateConfig) ProtoReflect() protoreflect.Message {
-	mi := &file_pb_simulation_proto_msgTypes[7]
+	mi := &file_pb_simulation_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -501,7 +537,7 @@ func (x *UpdateConfig) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateConfig.ProtoReflect.Descriptor instead.
 func (*UpdateConfig) Descriptor() ([]byte, []int) {
-	return file_pb_simulation_proto_rawDescGZIP(), []int{7}
+	return file_pb_simulation_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *UpdateConfig) GetDetectionRadius() float64 {
@@ -526,21 +562,20 @@ const file_pb_simulation_proto_rawDesc = "" +
 	"\x04Tick\x12\x1d\n" +
 	"\n" +
 	"delta_time\x18\x01 \x01(\x03R\tdeltaTime\x12(\n" +
-	"\acontext\x18\x02 \x01(\v2\x0e.pb.PerceptionR\acontext\"\n" +
+	"\acontext\x18\x02 \x01(\v2\x0e.pb.PerceptionR\acontext\"$\n" +
+	"\x06Vector\x12\f\n" +
+	"\x01x\x18\x01 \x01(\x01R\x01x\x12\f\n" +
+	"\x01y\x18\x02 \x01(\x01R\x01y\"\n" +
 	"\n" +
-	"\bGetState\"\xbd\x01\n" +
+	"\bGetState\"\x91\x01\n" +
 	"\n" +
 	"ActorState\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12#\n" +
-	"\x05color\x18\x02 \x01(\x0e2\r.pb.TeamColorR\x05color\x12\x1d\n" +
-	"\n" +
-	"position_x\x18\x03 \x01(\x01R\tpositionX\x12\x1d\n" +
-	"\n" +
-	"position_y\x18\x04 \x01(\x01R\tpositionY\x12\x1d\n" +
-	"\n" +
-	"velocity_x\x18\x05 \x01(\x01R\tvelocityX\x12\x1d\n" +
-	"\n" +
-	"velocity_y\x18\x06 \x01(\x01R\tvelocityY\"`\n" +
+	"\x05color\x18\x02 \x01(\x0e2\r.pb.TeamColorR\x05color\x12&\n" +
+	"\bposition\x18\x03 \x01(\v2\n" +
+	".pb.VectorR\bposition\x12&\n" +
+	"\bvelocity\x18\x04 \x01(\v2\n" +
+	".pb.VectorR\bvelocity\"`\n" +
 	"\n" +
 	"Perception\x12(\n" +
 	"\atargets\x18\x01 \x03(\v2\x0e.pb.ActorStateR\atargets\x12(\n" +
@@ -578,31 +613,34 @@ func file_pb_simulation_proto_rawDescGZIP() []byte {
 }
 
 var file_pb_simulation_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_pb_simulation_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
+var file_pb_simulation_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
 var file_pb_simulation_proto_goTypes = []any{
 	(TeamColor)(0),        // 0: pb.TeamColor
 	(*Tick)(nil),          // 1: pb.Tick
-	(*GetState)(nil),      // 2: pb.GetState
-	(*ActorState)(nil),    // 3: pb.ActorState
-	(*Perception)(nil),    // 4: pb.Perception
-	(*Convert)(nil),       // 5: pb.Convert
-	(*ReportStatus)(nil),  // 6: pb.ReportStatus
-	(*WorldSnapshot)(nil), // 7: pb.WorldSnapshot
-	(*UpdateConfig)(nil),  // 8: pb.UpdateConfig
+	(*Vector)(nil),        // 2: pb.Vector
+	(*GetState)(nil),      // 3: pb.GetState
+	(*ActorState)(nil),    // 4: pb.ActorState
+	(*Perception)(nil),    // 5: pb.Perception
+	(*Convert)(nil),       // 6: pb.Convert
+	(*ReportStatus)(nil),  // 7: pb.ReportStatus
+	(*WorldSnapshot)(nil), // 8: pb.WorldSnapshot
+	(*UpdateConfig)(nil),  // 9: pb.UpdateConfig
 }
 var file_pb_simulation_proto_depIdxs = []int32{
-	4, // 0: pb.Tick.context:type_name -> pb.Perception
+	5, // 0: pb.Tick.context:type_name -> pb.Perception
 	0, // 1: pb.ActorState.color:type_name -> pb.TeamColor
-	3, // 2: pb.Perception.targets:type_name -> pb.ActorState
-	3, // 3: pb.Perception.friends:type_name -> pb.ActorState
-	0, // 4: pb.Convert.target_color:type_name -> pb.TeamColor
-	3, // 5: pb.ReportStatus.state:type_name -> pb.ActorState
-	3, // 6: pb.WorldSnapshot.actors:type_name -> pb.ActorState
-	7, // [7:7] is the sub-list for method output_type
-	7, // [7:7] is the sub-list for method input_type
-	7, // [7:7] is the sub-list for extension type_name
-	7, // [7:7] is the sub-list for extension extendee
-	0, // [0:7] is the sub-list for field type_name
+	2, // 2: pb.ActorState.position:type_name -> pb.Vector
+	2, // 3: pb.ActorState.velocity:type_name -> pb.Vector
+	4, // 4: pb.Perception.targets:type_name -> pb.ActorState
+	4, // 5: pb.Perception.friends:type_name -> pb.ActorState
+	0, // 6: pb.Convert.target_color:type_name -> pb.TeamColor
+	4, // 7: pb.ReportStatus.state:type_name -> pb.ActorState
+	4, // 8: pb.WorldSnapshot.actors:type_name -> pb.ActorState
+	9, // [9:9] is the sub-list for method output_type
+	9, // [9:9] is the sub-list for method input_type
+	9, // [9:9] is the sub-list for extension type_name
+	9, // [9:9] is the sub-list for extension extendee
+	0, // [0:9] is the sub-list for field type_name
 }
 
 func init() { file_pb_simulation_proto_init() }
@@ -616,7 +654,7 @@ func file_pb_simulation_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_pb_simulation_proto_rawDesc), len(file_pb_simulation_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   8,
+			NumMessages:   9,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
