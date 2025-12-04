@@ -14,5 +14,7 @@
   "avoidFactor": 0.05,
   "matchingFactor": 0.05,
   "turnFactor": 0.2,
-  "minSpeed": 2.0
+  "minSpeed": 2.0,
+  "logFormat": "json",
+  "logLevel": "info"
 }

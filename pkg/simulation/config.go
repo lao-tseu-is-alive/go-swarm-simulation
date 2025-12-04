@@ -52,6 +52,12 @@ type Config struct {
 
 	// MinSpeed is the minimum speed a Blue actor tries to maintain.
 	MinSpeed float64 `json:"minSpeed"`
+
+	// Logging
+	// LogLevel sets the logging level (debug, info, warn, error). Default: info
+	LogLevel string `json:"logLevel"`
+	// LogFormat sets the logging format (json, text). Default: json
+	LogFormat string `json:"logFormat"`
 }
 
 func DefaultConfig() *Config {
@@ -72,6 +78,8 @@ func DefaultConfig() *Config {
 		MaxSpeed:        4.0,
 		MinSpeed:        2.0,
 		Aggression:      0.8,
+		LogLevel:        "info",
+		LogFormat:       "json",
 	}
 }
 

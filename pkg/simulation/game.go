@@ -10,7 +10,6 @@ import (
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
 	"github.com/hajimehoshi/ebiten/v2/vector"
 	"github.com/tochemey/goakt/v3/actor"
-	golog "github.com/tochemey/goakt/v3/log"
 	"google.golang.org/protobuf/runtime/protoimpl"
 )
 
@@ -32,12 +31,9 @@ type Game struct {
 	cfg *Config
 }
 
-func GetNewGame(ctx context.Context, cfg *Config) *Game {
-	// 1. Start Actor System
-	system, _ := actor.NewActorSystem("SwarmWorld",
-		actor.WithLogger(golog.DefaultLogger),
-		actor.WithActorInitMaxRetries(3))
-	_ = system.Start(ctx)
+func GetNewGame(ctx context.Context, cfg *Config, system actor.ActorSystem) *Game {
+	// 1. System is now passed in
+	// system, _ := actor.NewActorSystem(...) // Removed
 
 	// 2. Create the channel for World -> UI communication
 	snapshotCh := make(chan *WorldSnapshot, 10)

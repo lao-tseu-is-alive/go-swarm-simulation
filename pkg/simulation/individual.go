@@ -254,5 +254,5 @@ func (i *Individual) chaseClosestTarget() {
 // ============================================================================
 
 func (i *Individual) Log(sys actor.ActorSystem, format string, args ...interface{}) {
-	sys.Logger().Infof("[%s] "+format, append([]interface{}{i.ID}, args...)...)
+	sys.Logger().Debugf("[%s] "+format, append([]interface{}{i.ID}, args...)...)
 }
