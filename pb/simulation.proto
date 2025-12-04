@@ -10,13 +10,19 @@ message Tick {
   Perception context = 2; // Optional field
 }
 
+enum TeamColor {
+  TEAM_UNSPECIFIED = 0;
+  TEAM_RED = 1;
+  TEAM_BLUE = 2;
+}
+
 // Sent by the World to ask for current status
 message GetState {}
 
 // The response containing the actor's data
 message ActorState {
   string id = 1;
-  string color = 2; // "RED" or "BLUE"
+  TeamColor color = 2; // "RED" or "BLUE"
   double position_x = 3;
   double position_y = 4;
   double velocity_x = 5;
@@ -30,7 +36,7 @@ message Perception {
 
 // Convert message is the command to switch teams
 message Convert {
-  string target_color = 1;
+  TeamColor target_color = 1;
 }
 
 // Sent by Individual -> World

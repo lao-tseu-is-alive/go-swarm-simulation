@@ -15,7 +15,7 @@ const (
 
 type Individual struct {
 	ID             string
-	Color          string
+	Color          TeamColor
 	X, Y           float64
 	vx, vy         float64
 	visibleTargets []*ActorState // Enemies
@@ -25,7 +25,7 @@ type Individual struct {
 
 var _ actor.Actor = (*Individual)(nil)
 
-func NewIndividual(color string, startX, startY, vx, vy float64, cfg *Config) *Individual {
+func NewIndividual(color TeamColor, startX, startY, vx, vy float64, cfg *Config) *Individual {
 	return &Individual{
 		Color: color,
 		X:     startX,
@@ -58,7 +58,7 @@ func (i *Individual) PostStop(ctx *actor.Context) error {
 
 func (i *Individual) Receive(ctx *actor.ReceiveContext) {
 	// Route to appropriate behavior based on current color
-	if i.Color == ColorRed {
+	if i.Color == TeamColor_TEAM_RED {
 		ctx.Become(i.RedBehavior)
 		i.RedBehavior(ctx)
 	} else {
@@ -164,7 +164,7 @@ func (i *Individual) handleConversion(ctx *actor.ReceiveContext, msg *Convert) {
 		ctx.Self().Name(), oldColor, i.Color)
 
 	// Switch behavior function
-	if i.Color == ColorRed {
+	if i.Color == TeamColor_TEAM_RED {
 		ctx.Become(i.RedBehavior)
 	} else {
 		ctx.Become(i.BlueBehavior)

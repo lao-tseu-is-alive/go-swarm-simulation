@@ -114,7 +114,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	if g.lastState != nil {
 		for _, entity := range g.lastState.Actors {
 			var clr color.Color
-			if entity.Color == ColorRed {
+			if entity.Color == TeamColor_TEAM_RED {
 				clr = color.RGBA{R: 255, G: 50, B: 50, A: 255}
 				vector.StrokeCircle(
 					screen,

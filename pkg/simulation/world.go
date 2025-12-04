@@ -188,7 +188,7 @@ func (w *WorldActor) scanNeighbors(ctx *actor.ReceiveContext, me *ActorState, ra
 
 					// Combat Logic: Red attacks Blue
 					// We check this here to avoid re-iterating neighbors later
-					if me.Color == ColorRed && other.Color == ColorBlue {
+					if me.Color == TeamColor_TEAM_RED && other.Color == TeamColor_TEAM_BLUE {
 						if distSq < ranges.contactSq {
 							w.resolveCombat(ctx, me, other)
 						}
@@ -207,20 +207,20 @@ func (w *WorldActor) resolveCombat(ctx *actor.ReceiveContext, attacker, victim *
 		victim.PositionX,
 		victim.PositionY,
 		w.defenseRadius,
-		ColorBlue, // Target is Blue defenders
-		victim.Id, // Exclude the victim themselves
+		TeamColor_TEAM_BLUE, // Target is Blue defenders
+		victim.Id,           // Exclude the victim themselves
 	)
 
 	if defenders >= 3 {
 		// Defense Success: Attacker converts to Blue
-		w.sendConvert(ctx, attacker.Id, ColorBlue)
+		w.sendConvert(ctx, attacker.Id, TeamColor_TEAM_BLUE)
 	} else {
 		// Defense Failed: Victim converts to Red
-		w.sendConvert(ctx, victim.Id, ColorRed)
+		w.sendConvert(ctx, victim.Id, TeamColor_TEAM_RED)
 	}
 }
 
-func (w *WorldActor) sendConvert(ctx *actor.ReceiveContext, targetID string, newColor string) {
+func (w *WorldActor) sendConvert(ctx *actor.ReceiveContext, targetID string, newColor TeamColor) {
 	if pid := w.pidsCache[targetID]; pid != nil {
 		w.msgSentCount++
 		ctx.Tell(pid, &Convert{TargetColor: newColor})
@@ -254,7 +254,7 @@ func (w *WorldActor) spawnSwarm(ctx *actor.ReceiveContext) {
 		vx := (rand.Float64() - 0.5) * 2
 		vy := (rand.Float64() - 0.5) * 2
 
-		pid := ctx.Spawn(name, NewIndividual(ColorRed, startX, startY, vx, vy, w.cfg))
+		pid := ctx.Spawn(name, NewIndividual(TeamColor_TEAM_RED, startX, startY, vx, vy, w.cfg))
 		w.pids = append(w.pids, pid)
 		w.pidsCache[name] = pid
 
@@ -262,7 +262,7 @@ func (w *WorldActor) spawnSwarm(ctx *actor.ReceiveContext) {
 		// sees it and sends it a message.
 		w.actors[name] = &ActorState{
 			Id:        name,
-			Color:     ColorRed,
+			Color:     TeamColor_TEAM_RED,
 			PositionX: startX,
 			PositionY: startY,
 			VelocityX: vx,
@@ -286,13 +286,13 @@ func (w *WorldActor) spawnSwarm(ctx *actor.ReceiveContext) {
 		vx := (rand.Float64() - 0.5) * 2
 		vy := (rand.Float64() - 0.5) * 2
 
-		pid := ctx.Spawn(name, NewIndividual(ColorBlue, startX, startY, vx, vy, w.cfg))
+		pid := ctx.Spawn(name, NewIndividual(TeamColor_TEAM_BLUE, startX, startY, vx, vy, w.cfg))
 		w.pids = append(w.pids, pid)
 		w.pidsCache[name] = pid
 
 		w.actors[name] = &ActorState{
 			Id:        name,
-			Color:     ColorBlue,
+			Color:     TeamColor_TEAM_BLUE,
 			PositionX: startX,
 			PositionY: startY,
 			VelocityX: vx,
@@ -395,14 +395,14 @@ func (w *WorldActor) processInteractions(ctx *actor.ReceiveContext) {
 
 	// Only iterate Red actors to avoid double-processing
 	for _, attacker := range w.actors {
-		if attacker.Color != ColorRed {
+		if attacker.Color != TeamColor_TEAM_RED {
 			continue // Skip Blues
 		}
 
 		nearby := w.getNearbyActors(attacker.PositionX, attacker.PositionY)
 
 		for _, victim := range nearby {
-			if victim.Color != ColorBlue {
+			if victim.Color != TeamColor_TEAM_BLUE {
 				continue // Only attack Blues
 			}
 
@@ -416,7 +416,7 @@ func (w *WorldActor) processInteractions(ctx *actor.ReceiveContext) {
 				victim.PositionX,
 				victim.PositionY,
 				w.defenseRadius,
-				ColorBlue,
+				TeamColor_TEAM_BLUE,
 				victim.Id,
 			)
 
@@ -425,13 +425,13 @@ func (w *WorldActor) processInteractions(ctx *actor.ReceiveContext) {
 				// Defense success: Convert attacker
 				if pid := w.pidsCache[attacker.Id]; pid != nil {
 					w.msgSentCount++ // <--- COUNT CONVERT MSG
-					ctx.Tell(pid, &Convert{TargetColor: ColorBlue})
+					ctx.Tell(pid, &Convert{TargetColor: TeamColor_TEAM_BLUE})
 				}
 			} else {
 				// Defense failed: Convert victim
 				if pid := w.pidsCache[victim.Id]; pid != nil {
 					w.msgSentCount++ // <--- COUNT CONVERT MSG
-					ctx.Tell(pid, &Convert{TargetColor: ColorRed})
+					ctx.Tell(pid, &Convert{TargetColor: TeamColor_TEAM_RED})
 				}
 			}
 		}
@@ -447,7 +447,7 @@ func (w *WorldActor) buildSnapshot() *WorldSnapshot {
 
 	for _, state := range w.actors {
 		snapshot.Actors = append(snapshot.Actors, state)
-		if state.Color == ColorRed {
+		if state.Color == TeamColor_TEAM_RED {
 			snapshot.RedCount++
 		} else {
 			snapshot.BlueCount++
@@ -481,7 +481,7 @@ func (w *WorldActor) PostStop(ctx *actor.Context) error {
 
 // countFriendsInRadius returns the count of actors of 'targetColor' within 'radius', excluding 'excludeID'.
 // It performs 0 allocations.
-func (w *WorldActor) countFriendsInRadius(x, y, radius float64, targetColor string, excludeID string) int {
+func (w *WorldActor) countFriendsInRadius(x, y, radius float64, targetColor TeamColor, excludeID string) int {
 	radiusSq := radius * radius
 	cellSize := w.getCellSize()
 

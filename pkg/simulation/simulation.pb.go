@@ -21,6 +21,55 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+type TeamColor int32
+
+const (
+	TeamColor_TEAM_UNSPECIFIED TeamColor = 0
+	TeamColor_TEAM_RED         TeamColor = 1
+	TeamColor_TEAM_BLUE        TeamColor = 2
+)
+
+// Enum value maps for TeamColor.
+var (
+	TeamColor_name = map[int32]string{
+		0: "TEAM_UNSPECIFIED",
+		1: "TEAM_RED",
+		2: "TEAM_BLUE",
+	}
+	TeamColor_value = map[string]int32{
+		"TEAM_UNSPECIFIED": 0,
+		"TEAM_RED":         1,
+		"TEAM_BLUE":        2,
+	}
+)
+
+func (x TeamColor) Enum() *TeamColor {
+	p := new(TeamColor)
+	*p = x
+	return p
+}
+
+func (x TeamColor) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (TeamColor) Descriptor() protoreflect.EnumDescriptor {
+	return file_pb_simulation_proto_enumTypes[0].Descriptor()
+}
+
+func (TeamColor) Type() protoreflect.EnumType {
+	return &file_pb_simulation_proto_enumTypes[0]
+}
+
+func (x TeamColor) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use TeamColor.Descriptor instead.
+func (TeamColor) EnumDescriptor() ([]byte, []int) {
+	return file_pb_simulation_proto_rawDescGZIP(), []int{0}
+}
+
 // Sent by the World to tell actors to update their state
 type Tick struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -115,7 +164,7 @@ func (*GetState) Descriptor() ([]byte, []int) {
 type ActorState struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	Color         string                 `protobuf:"bytes,2,opt,name=color,proto3" json:"color,omitempty"` // "RED" or "BLUE"
+	Color         TeamColor              `protobuf:"varint,2,opt,name=color,proto3,enum=pb.TeamColor" json:"color,omitempty"` // "RED" or "BLUE"
 	PositionX     float64                `protobuf:"fixed64,3,opt,name=position_x,json=positionX,proto3" json:"position_x,omitempty"`
 	PositionY     float64                `protobuf:"fixed64,4,opt,name=position_y,json=positionY,proto3" json:"position_y,omitempty"`
 	VelocityX     float64                `protobuf:"fixed64,5,opt,name=velocity_x,json=velocityX,proto3" json:"velocity_x,omitempty"`
@@ -161,11 +210,11 @@ func (x *ActorState) GetId() string {
 	return ""
 }
 
-func (x *ActorState) GetColor() string {
+func (x *ActorState) GetColor() TeamColor {
 	if x != nil {
 		return x.Color
 	}
-	return ""
+	return TeamColor_TEAM_UNSPECIFIED
 }
 
 func (x *ActorState) GetPositionX() float64 {
@@ -252,7 +301,7 @@ func (x *Perception) GetFriends() []*ActorState {
 // Convert message is the command to switch teams
 type Convert struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	TargetColor   string                 `protobuf:"bytes,1,opt,name=target_color,json=targetColor,proto3" json:"target_color,omitempty"`
+	TargetColor   TeamColor              `protobuf:"varint,1,opt,name=target_color,json=targetColor,proto3,enum=pb.TeamColor" json:"target_color,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -287,11 +336,11 @@ func (*Convert) Descriptor() ([]byte, []int) {
 	return file_pb_simulation_proto_rawDescGZIP(), []int{4}
 }
 
-func (x *Convert) GetTargetColor() string {
+func (x *Convert) GetTargetColor() TeamColor {
 	if x != nil {
 		return x.TargetColor
 	}
-	return ""
+	return TeamColor_TEAM_UNSPECIFIED
 }
 
 // Sent by Individual -> World
@@ -479,11 +528,11 @@ const file_pb_simulation_proto_rawDesc = "" +
 	"delta_time\x18\x01 \x01(\x03R\tdeltaTime\x12(\n" +
 	"\acontext\x18\x02 \x01(\v2\x0e.pb.PerceptionR\acontext\"\n" +
 	"\n" +
-	"\bGetState\"\xae\x01\n" +
+	"\bGetState\"\xbd\x01\n" +
 	"\n" +
 	"ActorState\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\x12\x14\n" +
-	"\x05color\x18\x02 \x01(\tR\x05color\x12\x1d\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12#\n" +
+	"\x05color\x18\x02 \x01(\x0e2\r.pb.TeamColorR\x05color\x12\x1d\n" +
 	"\n" +
 	"position_x\x18\x03 \x01(\x01R\tpositionX\x12\x1d\n" +
 	"\n" +
@@ -495,9 +544,9 @@ const file_pb_simulation_proto_rawDesc = "" +
 	"\n" +
 	"Perception\x12(\n" +
 	"\atargets\x18\x01 \x03(\v2\x0e.pb.ActorStateR\atargets\x12(\n" +
-	"\afriends\x18\x02 \x03(\v2\x0e.pb.ActorStateR\afriends\",\n" +
-	"\aConvert\x12!\n" +
-	"\ftarget_color\x18\x01 \x01(\tR\vtargetColor\"4\n" +
+	"\afriends\x18\x02 \x03(\v2\x0e.pb.ActorStateR\afriends\";\n" +
+	"\aConvert\x120\n" +
+	"\ftarget_color\x18\x01 \x01(\x0e2\r.pb.TeamColorR\vtargetColor\"4\n" +
 	"\fReportStatus\x12$\n" +
 	"\x05state\x18\x01 \x01(\v2\x0e.pb.ActorStateR\x05state\"\xad\x01\n" +
 	"\rWorldSnapshot\x12&\n" +
@@ -510,7 +559,11 @@ const file_pb_simulation_proto_rawDesc = "" +
 	"\x06winner\x18\x05 \x01(\tR\x06winner\"^\n" +
 	"\fUpdateConfig\x12(\n" +
 	"\x0fDetectionRadius\x18\x01 \x01(\x01R\x0fDetectionRadius\x12$\n" +
-	"\rDefenseRadius\x18\x02 \x01(\x01R\rDefenseRadiusB5Z3github.com/lao-tseu-is-alive/go-swarm-simulation/pbb\x06proto3"
+	"\rDefenseRadius\x18\x02 \x01(\x01R\rDefenseRadius*>\n" +
+	"\tTeamColor\x12\x14\n" +
+	"\x10TEAM_UNSPECIFIED\x10\x00\x12\f\n" +
+	"\bTEAM_RED\x10\x01\x12\r\n" +
+	"\tTEAM_BLUE\x10\x02B5Z3github.com/lao-tseu-is-alive/go-swarm-simulation/pbb\x06proto3"
 
 var (
 	file_pb_simulation_proto_rawDescOnce sync.Once
@@ -524,28 +577,32 @@ func file_pb_simulation_proto_rawDescGZIP() []byte {
 	return file_pb_simulation_proto_rawDescData
 }
 
+var file_pb_simulation_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
 var file_pb_simulation_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
 var file_pb_simulation_proto_goTypes = []any{
-	(*Tick)(nil),          // 0: pb.Tick
-	(*GetState)(nil),      // 1: pb.GetState
-	(*ActorState)(nil),    // 2: pb.ActorState
-	(*Perception)(nil),    // 3: pb.Perception
-	(*Convert)(nil),       // 4: pb.Convert
-	(*ReportStatus)(nil),  // 5: pb.ReportStatus
-	(*WorldSnapshot)(nil), // 6: pb.WorldSnapshot
-	(*UpdateConfig)(nil),  // 7: pb.UpdateConfig
+	(TeamColor)(0),        // 0: pb.TeamColor
+	(*Tick)(nil),          // 1: pb.Tick
+	(*GetState)(nil),      // 2: pb.GetState
+	(*ActorState)(nil),    // 3: pb.ActorState
+	(*Perception)(nil),    // 4: pb.Perception
+	(*Convert)(nil),       // 5: pb.Convert
+	(*ReportStatus)(nil),  // 6: pb.ReportStatus
+	(*WorldSnapshot)(nil), // 7: pb.WorldSnapshot
+	(*UpdateConfig)(nil),  // 8: pb.UpdateConfig
 }
 var file_pb_simulation_proto_depIdxs = []int32{
-	3, // 0: pb.Tick.context:type_name -> pb.Perception
-	2, // 1: pb.Perception.targets:type_name -> pb.ActorState
-	2, // 2: pb.Perception.friends:type_name -> pb.ActorState
-	2, // 3: pb.ReportStatus.state:type_name -> pb.ActorState
-	2, // 4: pb.WorldSnapshot.actors:type_name -> pb.ActorState
-	5, // [5:5] is the sub-list for method output_type
-	5, // [5:5] is the sub-list for method input_type
-	5, // [5:5] is the sub-list for extension type_name
-	5, // [5:5] is the sub-list for extension extendee
-	0, // [0:5] is the sub-list for field type_name
+	4, // 0: pb.Tick.context:type_name -> pb.Perception
+	0, // 1: pb.ActorState.color:type_name -> pb.TeamColor
+	3, // 2: pb.Perception.targets:type_name -> pb.ActorState
+	3, // 3: pb.Perception.friends:type_name -> pb.ActorState
+	0, // 4: pb.Convert.target_color:type_name -> pb.TeamColor
+	3, // 5: pb.ReportStatus.state:type_name -> pb.ActorState
+	3, // 6: pb.WorldSnapshot.actors:type_name -> pb.ActorState
+	7, // [7:7] is the sub-list for method output_type
+	7, // [7:7] is the sub-list for method input_type
+	7, // [7:7] is the sub-list for extension type_name
+	7, // [7:7] is the sub-list for extension extendee
+	0, // [0:7] is the sub-list for field type_name
 }
 
 func init() { file_pb_simulation_proto_init() }
@@ -558,13 +615,14 @@ func file_pb_simulation_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_pb_simulation_proto_rawDesc), len(file_pb_simulation_proto_rawDesc)),
-			NumEnums:      0,
+			NumEnums:      1,
 			NumMessages:   8,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
 		GoTypes:           file_pb_simulation_proto_goTypes,
 		DependencyIndexes: file_pb_simulation_proto_depIdxs,
+		EnumInfos:         file_pb_simulation_proto_enumTypes,
 		MessageInfos:      file_pb_simulation_proto_msgTypes,
 	}.Build()
 	File_pb_simulation_proto = out.File
