@@ -32,3 +32,9 @@ go.work.sum
 .vscode/
 # simulation
 /config_scenario_10_times_less_red_butthey_wind.json
+/cpu.prof
+/.github/workflows/docker-publish.yml
+/.github/workflows/go.yml
+/reports/Grok _ X_Report_20251205.pdf
+/simulation
+/.github/workflows/trivy-scan.yml
