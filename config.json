@@ -16,7 +16,7 @@
   "turnFactor": 0.2,
   "minSpeed": 1.0,
   "logFormat": "text",
-  "logLevel": "info",
+  "logLevel": "warn",
   "displayDetectionCircle": false,
   "displayDefenseCircle": false
 }

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"image/color"
 	"math"
+	"time"
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
@@ -25,6 +26,12 @@ type Game struct {
 	sliderDefense   *Slider
 
 	cfg *Config
+
+	// Timing instrumentation
+	lastUpdateDuration time.Duration
+	lastDrawDuration   time.Duration
+	updateAvg          float64 // Rolling average in ms
+	drawAvg            float64 // Rolling average in ms
 }
 
 func GetNewGame(ctx context.Context, cfg *Config, system actor.ActorSystem) *Game {
@@ -67,6 +74,13 @@ func GetNewGame(ctx context.Context, cfg *Config, system actor.ActorSystem) *Gam
 }
 
 func (g *Game) Update() error {
+	start := time.Now()
+	defer func() {
+		g.lastUpdateDuration = time.Since(start)
+		// Rolling average (exponential moving average)
+		g.updateAvg = g.updateAvg*0.95 + float64(g.lastUpdateDuration.Microseconds())/1000.0*0.05
+	}()
+
 	// 1. Update UI Inputs
 	g.sliderDetection.Update()
 	g.sliderDefense.Update()
@@ -81,22 +95,12 @@ func (g *Game) Update() error {
 	// ONLY send a Tick if the game is NOT over.
 	// This effectively "freezes" the simulation in the final state.
 	if !g.lastState.IsGameOver {
-		// 3. Send Updated Config to World (Fire and Forget)
-		// Only send if changed (optimization omitted for brevity)
-		// In goakt, Tell is a method on the PID or Context?
-		// Usually: ctx.Tell(pid, msg) or actor.Tell(ctx, pid, msg)
-		// Looking at goakt docs or usage: system.Tell(ctx, pid, msg) isn't standard?
-		// Usually we use the context we have.
-		// Wait, main.go passes a context.
-		// Let's check how to send messages from outside an actor in goakt.
-		// Usually: actor.Tell(ctx, pid, message)
 		actor.Tell(g.ctx, g.worldPID, &UpdateConfig{
 			DetectionRadius: g.sliderDetection.Value,
 			DefenseRadius:   g.sliderDefense.Value,
 		})
 
-		// 4. Trigger Simulation Step
-		// We tell the World: "It's time to process a frame"
+		// Trigger Simulation Step
 		actor.Tell(g.ctx, g.worldPID, &Tick{})
 	}
 
@@ -104,14 +108,23 @@ func (g *Game) Update() error {
 }
 
 func (g *Game) Draw(screen *ebiten.Image) {
+	start := time.Now()
+	defer func() {
+		g.lastDrawDuration = time.Since(start)
+		g.drawAvg = g.drawAvg*0.95 + float64(g.lastDrawDuration.Microseconds())/1000.0*0.05
+	}()
 
 	// 1. Draw all actors from the last known snapshot
 	if g.lastState != nil {
+		// Pre-allocate batched vertices for Blue boids (3 vertices per boid)
+		blueCount := int(g.lastState.BlueCount)
+		boidVertices := make([]ebiten.Vertex, 0, blueCount*3)
+		boidIndices := make([]uint16, 0, blueCount*3)
+
 		for _, entity := range g.lastState.Actors {
-			var clr color.Color
 			if entity.Color == TeamColor_TEAM_RED {
-				clr = color.RGBA{R: 255, G: 50, B: 50, A: 255}
 				if g.cfg.DisplayDetectionCircle {
+					clr := color.RGBA{R: 255, G: 50, B: 50, A: 255}
 					vector.StrokeCircle(
 						screen,
 						float32(entity.Position.X),
@@ -122,21 +135,31 @@ func (g *Game) Draw(screen *ebiten.Image) {
 						true,
 					)
 				}
-				vector.FillCircle(
-					screen,
-					float32(entity.Position.X),
-					float32(entity.Position.Y),
-					6,
-					clr,
-					true,
-				)
+				// Use pre-rendered circle sprite (batched by Ebiten automatically)
+				op := &ebiten.DrawImageOptions{}
+				op.GeoM.Translate(entity.Position.X-float64(circleRadius), entity.Position.Y-float64(circleRadius))
+				screen.DrawImage(redCircleImg, op)
 			} else {
-				// Blue Boids - Draw as Triangles
-				drawBoid(screen, entity)
+				// Blue Boids - Collect vertices for batched draw
+				angle := math.Atan2(entity.Velocity.Y, entity.Velocity.X)
+				tipX := entity.Position.X + math.Cos(angle)*6
+				tipY := entity.Position.Y + math.Sin(angle)*6
+				rightX := entity.Position.X + math.Cos(angle+2.5)*5
+				rightY := entity.Position.Y + math.Sin(angle+2.5)*5
+				leftX := entity.Position.X + math.Cos(angle-2.5)*5
+				leftY := entity.Position.Y + math.Sin(angle-2.5)*5
 
-				// Optional: Draw Defense Radius ring if you want to see it
+				baseIdx := uint16(len(boidVertices))
+				boidVertices = append(boidVertices,
+					ebiten.Vertex{DstX: float32(tipX), DstY: float32(tipY), SrcX: 1, SrcY: 1, ColorR: 1, ColorG: 1, ColorB: 1, ColorA: 1},
+					ebiten.Vertex{DstX: float32(rightX), DstY: float32(rightY), SrcX: 1, SrcY: 1, ColorR: 1, ColorG: 1, ColorB: 1, ColorA: 1},
+					ebiten.Vertex{DstX: float32(leftX), DstY: float32(leftY), SrcX: 1, SrcY: 1, ColorR: 1, ColorG: 1, ColorB: 1, ColorA: 1},
+				)
+				boidIndices = append(boidIndices, baseIdx, baseIdx+1, baseIdx+2)
+
+				// Optional: Draw Defense Radius ring
 				if g.cfg.DisplayDefenseCircle {
-					clr = color.RGBA{R: 50, G: 100, B: 255, A: 50} // Transparent blue
+					clr := color.RGBA{R: 50, G: 100, B: 255, A: 50}
 					vector.StrokeCircle(
 						screen,
 						float32(entity.Position.X),
@@ -148,6 +171,11 @@ func (g *Game) Draw(screen *ebiten.Image) {
 					)
 				}
 			}
+		}
+
+		// SINGLE batched draw call for all Blue boids
+		if len(boidVertices) > 0 {
+			screen.DrawTriangles(boidVertices, boidIndices, whiteImage, &ebiten.DrawTrianglesOptions{})
 		}
 	}
 
@@ -166,11 +194,15 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		ebitenutil.DebugPrintAt(screen, msg, int(g.cfg.WorldWidth/2-40), int(g.cfg.WorldHeight/2))
 	}
 
-	msg := fmt.Sprintf("Detection: %.0f\n\n\nDefense: %.0f\n\n\n\nFPS: %.2f\nTPS: %.2f",
+	// Display timing breakdown for performance analysis
+	msg := fmt.Sprintf("Detection: %.0f\n\n\nDefense: %.0f\n\n\n\nFPS: %.2f\nTPS: %.2f\n\nUpdate: %.2fms\nDraw:   %.2fms\nTotal:  %.2fms",
 		g.sliderDetection.Value,
 		g.sliderDefense.Value,
-		ebiten.ActualFPS(), // Frame per Second
-		ebiten.ActualTPS()) // Ticks per second (how many times Update is called by second)
+		ebiten.ActualFPS(),
+		ebiten.ActualTPS(),
+		g.updateAvg,
+		g.drawAvg,
+		g.updateAvg+g.drawAvg)
 	ebitenutil.DebugPrint(screen, msg)
 
 }
@@ -229,10 +261,28 @@ func (g *Game) drawStatsBar(screen *ebiten.Image) {
 
 func (g *Game) Layout(w, h int) (int, int) { return int(g.cfg.WorldWidth), int(g.cfg.WorldHeight) }
 
-var whiteImage = ebiten.NewImage(3, 3)
+// Pre-rendered sprites for fast batched drawing
+var (
+	whiteImage   = ebiten.NewImage(3, 3)
+	redCircleImg *ebiten.Image
+	circleRadius = 6
+)
 
 func init() {
 	whiteImage.Fill(color.RGBA{R: 100, G: 200, B: 255, A: 255})
+
+	// Pre-render a red filled circle (much faster than vector.FillCircle each frame)
+	size := circleRadius * 2
+	redCircleImg = ebiten.NewImage(size, size)
+	for y := 0; y < size; y++ {
+		for x := 0; x < size; x++ {
+			dx := float64(x - circleRadius)
+			dy := float64(y - circleRadius)
+			if dx*dx+dy*dy <= float64(circleRadius*circleRadius) {
+				redCircleImg.Set(x, y, color.RGBA{R: 255, G: 50, B: 50, A: 255})
+			}
+		}
+	}
 }
 
 func drawBoid(screen *ebiten.Image, b *ActorState) {

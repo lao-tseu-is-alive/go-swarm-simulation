@@ -2,9 +2,12 @@ package main
 
 import (
 	"context"
+	"flag"
 	"io"
 	stdLog "log"
 	"os"
+	"runtime"
+	"runtime/pprof"
 	"strings"
 
 	"github.com/hajimehoshi/ebiten/v2"
@@ -13,6 +16,11 @@ import (
 	"github.com/tochemey/goakt/v3/log"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
+)
+
+var (
+	cpuprofile = flag.String("cpuprofile", "", "write cpu profile to file")
+	memprofile = flag.String("memprofile", "", "write memory profile to file")
 )
 
 // ZapAdapter adapts zap.SugaredLogger to goakt.Logger interface
@@ -37,6 +45,21 @@ func (z *ZapAdapter) StdLogger() *stdLog.Logger {
 }
 
 func main() {
+	flag.Parse()
+
+	// CPU Profiling
+	if *cpuprofile != "" {
+		f, err := os.Create(*cpuprofile)
+		if err != nil {
+			stdLog.Fatal("could not create CPU profile: ", err)
+		}
+		defer f.Close()
+		if err := pprof.StartCPUProfile(f); err != nil {
+			stdLog.Fatal("could not start CPU profile: ", err)
+		}
+		defer pprof.StopCPUProfile()
+	}
+
 	ctx := context.Background()
 	// Load Config
 	cfg, err := simulation.LoadConfig("config.json", "config_schema.json")
@@ -99,5 +122,18 @@ func main() {
 	err = ebiten.RunGame(game)
 	if err != nil {
 		stdLog.Fatal(err)
+	}
+
+	// Memory Profiling (written on exit)
+	if *memprofile != "" {
+		f, err := os.Create(*memprofile)
+		if err != nil {
+			stdLog.Fatal("could not create memory profile: ", err)
+		}
+		defer f.Close()
+		runtime.GC() // Run GC before taking heap profile
+		if err := pprof.WriteHeapProfile(f); err != nil {
+			stdLog.Fatal("could not write memory profile: ", err)
+		}
 	}
 }
