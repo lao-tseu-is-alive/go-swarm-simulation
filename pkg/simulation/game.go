@@ -15,6 +15,14 @@ import (
 	"github.com/tochemey/goakt/v3/actor"
 )
 
+// Pre-rendered sprites for fast batched drawing
+var (
+	whiteImage    = ebiten.NewImage(3, 3)
+	redSpaceship  *ebiten.Image
+	blueSpaceship *ebiten.Image
+	spaceshipSize = 16.0 // The new sprite is 16x16
+)
+
 type Game struct {
 	ctx        context.Context
 	System     actor.ActorSystem
@@ -184,11 +192,6 @@ func (g *Game) Draw(screen *ebiten.Image) {
 
 	// 1. Draw all actors from the last known snapshot
 	if g.lastState != nil {
-		// Pre-allocate batched vertices for Blue boids (3 vertices per boid)
-		blueCount := int(g.lastState.BlueCount)
-		boidVertices := make([]ebiten.Vertex, 0, blueCount*3)
-		boidIndices := make([]uint16, 0, blueCount*3)
-
 		for _, entity := range g.lastState.Actors {
 			if entity.Color == pb.TeamColor_TEAM_RED {
 				if g.widgetDisplayDetection.Value {
@@ -203,28 +206,25 @@ func (g *Game) Draw(screen *ebiten.Image) {
 						true,
 					)
 				}
-				// Use pre-rendered circle sprite (batched by Ebiten automatically)
+				// Use pre-rendered sprite (batched by Ebiten automatically)
 				op := &ebiten.DrawImageOptions{}
-				op.GeoM.Translate(entity.Position.X-float64(circleRadius), entity.Position.Y-float64(circleRadius))
-				screen.DrawImage(redCircleImg, op)
-			} else {
-				// Blue Boids - Collect vertices for batched draw
+				// Center the origin of the image (assuming 16x16 sprite)
+				w, h := redSpaceship.Bounds().Dx(), redSpaceship.Bounds().Dy()
+				op.GeoM.Translate(-float64(w)/2, -float64(h)/2)
+
+				// Rotate to match velocity
+				// Note: The sprite should be drawn facing "Right" (0 radians) by default.
+				// Since my ASCII art is a saucer facing "Up", we add math.Pi/2 (90 deg)
+				// to align the top of the saucer with the movement vector.
 				angle := math.Atan2(entity.Velocity.Y, entity.Velocity.X)
-				tipX := entity.Position.X + math.Cos(angle)*6
-				tipY := entity.Position.Y + math.Sin(angle)*6
-				rightX := entity.Position.X + math.Cos(angle+2.5)*5
-				rightY := entity.Position.Y + math.Sin(angle+2.5)*5
-				leftX := entity.Position.X + math.Cos(angle-2.5)*5
-				leftY := entity.Position.Y + math.Sin(angle-2.5)*5
+				op.GeoM.Rotate(angle + math.Pi/2)
 
-				baseIdx := uint16(len(boidVertices))
-				boidVertices = append(boidVertices,
-					ebiten.Vertex{DstX: float32(tipX), DstY: float32(tipY), SrcX: 1, SrcY: 1, ColorR: 1, ColorG: 1, ColorB: 1, ColorA: 1},
-					ebiten.Vertex{DstX: float32(rightX), DstY: float32(rightY), SrcX: 1, SrcY: 1, ColorR: 1, ColorG: 1, ColorB: 1, ColorA: 1},
-					ebiten.Vertex{DstX: float32(leftX), DstY: float32(leftY), SrcX: 1, SrcY: 1, ColorR: 1, ColorG: 1, ColorB: 1, ColorA: 1},
-				)
-				boidIndices = append(boidIndices, baseIdx, baseIdx+1, baseIdx+2)
+				// Move to actual position in world
+				op.GeoM.Translate(entity.Position.X, entity.Position.Y)
 
+				screen.DrawImage(redSpaceship, op)
+			} else {
+				// --- BLUE BOIDS (The Arrow Jets) ---
 				// Optional: Draw Defense Radius ring
 				if g.widgetDisplayDefense.Value {
 					clr := color.RGBA{R: 50, G: 100, B: 255, A: 50}
@@ -238,13 +238,25 @@ func (g *Game) Draw(screen *ebiten.Image) {
 						true,
 					)
 				}
+				// 2. Draw the Blue Sprite
+				op := &ebiten.DrawImageOptions{}
+
+				// Center the sprite
+				w, h := blueSpaceship.Bounds().Dx(), blueSpaceship.Bounds().Dy()
+				op.GeoM.Translate(-float64(w)/2, -float64(h)/2)
+
+				// Rotation:
+				// Align the "Up" facing sprite with the velocity vector
+				angle := math.Atan2(entity.Velocity.Y, entity.Velocity.X)
+				op.GeoM.Rotate(angle + math.Pi/2)
+
+				// Position
+				op.GeoM.Translate(entity.Position.X, entity.Position.Y)
+
+				screen.DrawImage(blueSpaceship, op)
 			}
 		}
 
-		// SINGLE batched draw call for all Blue boids
-		if len(boidVertices) > 0 {
-			screen.DrawTriangles(boidVertices, boidIndices, whiteImage, &ebiten.DrawTrianglesOptions{})
-		}
 	}
 
 	// 2. Draw UI Panel
@@ -328,30 +340,80 @@ func (g *Game) drawStatsBar(screen *ebiten.Image) {
 
 func (g *Game) Layout(w, h int) (int, int) { return int(g.cfg.WorldWidth), int(g.cfg.WorldHeight) }
 
-// Pre-rendered sprites for fast batched drawing
-var (
-	whiteImage   = ebiten.NewImage(3, 3)
-	redCircleImg *ebiten.Image
-	circleRadius = 6
-)
-
 func init() {
 	whiteImage.Fill(color.RGBA{R: 100, G: 200, B: 255, A: 255})
+	// Legend:
+	// . = Transparent
+	// G = Green (Glass/Dome)
+	// P = Purple (Hull)
+	// B = Blue (Lights)
+	// Y = Yellow (Lights)
+	// R = Red (Thrusters)
+	// W = White (Highlights)
+	design := []string{
+		"......GW......",
+		"....GGGGGG....",
+		" ...G..GG..G...",
+		"..PPPPPPPPPP..",
+		".B.P.P.P.P.B.",
+		"BBPTPTPTPTPPBB",
+		"YYPYPYPYPYPYYY",
+		".R...R..R...R.",
+		"......RR......",
+	}
 
-	// Pre-render a red filled circle (much faster than vector.FillCircle each frame)
-	size := circleRadius * 2
-	redCircleImg = ebiten.NewImage(size, size)
-	for y := 0; y < size; y++ {
-		for x := 0; x < size; x++ {
-			dx := float64(x - circleRadius)
-			dy := float64(y - circleRadius)
-			if dx*dx+dy*dy <= float64(circleRadius*circleRadius) {
-				redCircleImg.Set(x, y, color.RGBA{R: 255, G: 50, B: 50, A: 255})
+	// Map characters to colors
+	palette := map[rune]color.RGBA{
+		'G': {R: 50, G: 255, B: 50, A: 255},   // Alien Green
+		'W': {R: 200, G: 255, B: 200, A: 255}, // Reflection
+		'P': {R: 150, G: 50, B: 200, A: 255},  // Funky Purple
+		'T': {R: 120, G: 40, B: 180, A: 255},  // Darker Purple
+		'B': {R: 50, G: 150, B: 255, A: 255},  // Cyan/Blue lights
+		'Y': {R: 255, G: 255, B: 0, A: 255},   // Yellow lights
+		'R': {R: 255, G: 100, B: 50, A: 255},  // Engine glow
+	}
+
+	redSpaceship = generateSprite(design, palette)
+
+	// --- Blue Sprite Design (Sleek Arrow/Jet) ---
+	blueDesign := []string{
+		".......C.......",
+		"......CWC......",
+		"......CBC......",
+		".....BBBBB.....",
+		"....B.B.B.B....",
+		"...D..B.B..D...",
+		"..D...Y.Y...D..",
+		".D....F.F....D.",
+	}
+
+	bluePalette := map[rune]color.RGBA{
+		'C': {R: 0, G: 255, B: 255, A: 255},   // Cyan Tip
+		'W': {R: 255, G: 255, B: 255, A: 255}, // White Cockpit/Shine
+		'B': {R: 0, G: 100, B: 255, A: 255},   // Main Blue Body
+		'D': {R: 0, G: 0, B: 150, A: 255},     // Dark Blue Wings
+		'Y': {R: 255, G: 200, B: 0, A: 255},   // Yellow Engine Ports
+		'F': {R: 255, G: 100, B: 0, A: 200},   // Faint Engine Exhaust
+	}
+
+	blueSpaceship = generateSprite(blueDesign, bluePalette)
+}
+
+// generateSprite converts an ASCII grid into an Ebiten image
+func generateSprite(design []string, palette map[rune]color.RGBA) *ebiten.Image {
+	h := len(design)
+	w := len(design[0])
+	img := ebiten.NewImage(w, h)
+
+	for y, row := range design {
+		for x, char := range row {
+			if col, ok := palette[char]; ok {
+				img.Set(x, y, col)
 			}
 		}
 	}
+	return img
 }
-
 func drawBoid(screen *ebiten.Image, b *pb.ActorState) {
 	angle := math.Atan2(b.Velocity.Y, b.Velocity.X)
 
