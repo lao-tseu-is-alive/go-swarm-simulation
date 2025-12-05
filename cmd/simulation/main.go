@@ -103,7 +103,7 @@ func main() {
 	adapter := &ZapAdapter{SugaredLogger: logger.Sugar()}
 
 	ebiten.SetWindowSize(int(cfg.WorldWidth), int(cfg.WorldHeight))
-	ebiten.SetWindowTitle("Swarm: Red vs Blue (Defense Mode)")
+	ebiten.SetWindowTitle("Red Virus vs Blue Flock...Convert or Be Converted 🦠🚀") // suggested by Grok 4.1 🤣🔥
 
 	// 2. Start Actor System with Custom Logger
 	system, _ := actor.NewActorSystem("SwarmWorld",

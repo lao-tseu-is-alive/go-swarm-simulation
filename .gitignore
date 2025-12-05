@@ -31,3 +31,4 @@ go.work.sum
 .idea/
 .vscode/
 # simulation
+/config_scenario_10_times_less_red_butthey_wind.json
