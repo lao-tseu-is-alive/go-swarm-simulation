@@ -234,7 +234,7 @@ func (i *Individual) chaseClosestTarget() {
 	}
 
 	// Calculate pursuit vector
-	pursuit := i.State.Pos.Sub(i.State.Pos)
+	pursuit := GeomVector2DFromProto(closest.Position).Sub(i.State.Pos)
 	length := i.State.Pos.DistanceTo(GeomVector2DFromProto(closest.Position))
 
 	if length > 0 {
