@@ -413,7 +413,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		g.drawAvg,
 		g.updateAvg+g.drawAvg)
 	// Print stats on the right side
-	ebitenutil.DebugPrintAt(screen, msg, int(g.cfg.WorldWidth)-150, 10)
+	ebitenutil.DebugPrintAt(screen, msg, int(g.cfg.WorldWidth)-150, 50)
 
 }
 
