@@ -1,9 +1,11 @@
 package ui
 
 import (
+	"fmt"
 	"image/color"
 
 	"github.com/hajimehoshi/ebiten/v2"
+	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
 	"github.com/hajimehoshi/ebiten/v2/vector"
 )
 
@@ -59,5 +61,28 @@ func (s *Slider) Draw(screen *ebiten.Image) {
 
 	// Draw Value Bar (Light Gray/White)
 	ratio := (s.Value - s.Min) / (s.Max - s.Min)
-	vector.FillRect(screen, float32(s.X), float32(s.Y), float32(s.W*ratio), float32(s.H), color.RGBA{R: 200, G: 200, B: 200, A: 255}, true)
+	barWidth := s.W * ratio
+	vector.FillRect(screen, float32(s.X), float32(s.Y), float32(barWidth), float32(s.H), color.RGBA{R: 200, G: 200, B: 200, A: 255}, true)
+
+	// Draw current value at the right end of the bar
+	// Format value based on magnitude
+	var valueText string
+	if s.Value >= 5 {
+		// Values >= 5: no decimals
+		valueText = fmt.Sprintf("%.0f", s.Value)
+	} else if s.Value < 0.01 && s.Value > 0 {
+		// Very small values - use more decimals
+		valueText = fmt.Sprintf("%.4f", s.Value)
+	} else if s.Value < 1 {
+		// Small values - 2 decimals
+		valueText = fmt.Sprintf("%.2f", s.Value)
+	} else {
+		// Medium values (1-5) - 1 decimal
+		valueText = fmt.Sprintf("%.1f", s.Value)
+	}
+
+	// Position text at the right end of the value bar
+	textX := int(s.X + barWidth + 5)
+	textY := int(s.Y + 5)
+	ebitenutil.DebugPrintAt(screen, valueText, textX, textY)
 }
