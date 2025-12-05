@@ -1,6 +1,6 @@
 {
-  "worldWidth": 1500,
-  "worldHeight": 900,
+  "worldWidth": 1200,
+  "worldHeight": 950,
   "numRedAtStart": 15,
   "numBlueAtStart": 85,
   "detectionRadius": 22,

@@ -634,6 +634,11 @@ func (g *Game) restartSimulation() {
 	g.cfg.DisplayDetectionCircle = g.widgetDisplayDetection.Value
 	g.cfg.DisplayDefenseCircle = g.widgetDisplayDefense.Value
 
+	// Reset game over state
+	g.lastState = &pb.WorldSnapshot{
+		IsGameOver: false,
+	}
+
 	// Spawn new world
 	worldActor := NewWorldActor(g.snapshotCh, g.cfg)
 	worldPID, err := g.System.Spawn(g.ctx, "world", worldActor)
