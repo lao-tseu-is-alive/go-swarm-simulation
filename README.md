@@ -15,7 +15,7 @@ The simulation visualizes two distinct behaviors interacting in a 2D world.
 
 # 
 
-![demo gif placeholder]()
+![demo screenshot](https://raw.githubusercontent.com/lao-tseu-is-alive/go-swarm-simulation/refs/heads/main/pictures/screenshot.png)
 *(live demo – 25 red vs 250 blue boids tiny spaceships fighting for ideological supremacy)*
 
 A real-time, visually polished swarm simulation in Go where **Red aggressive hunters** try to infect **Blue flocking prey**.  
