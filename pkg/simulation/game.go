@@ -166,9 +166,11 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		ebitenutil.DebugPrintAt(screen, msg, int(g.cfg.WorldWidth/2-40), int(g.cfg.WorldHeight/2))
 	}
 
-	msg := fmt.Sprintf("Detection: %.0f\n\n\nDefense: %.0f\n\n",
+	msg := fmt.Sprintf("Detection: %.0f\n\n\nDefense: %.0f\n\n\n\nFPS: %.2f\nTPS: %.2f",
 		g.sliderDetection.Value,
-		g.sliderDefense.Value)
+		g.sliderDefense.Value,
+		ebiten.ActualFPS(), // Frame per Second
+		ebiten.ActualTPS()) // Ticks per second (how many times Update is called by second)
 	ebitenutil.DebugPrint(screen, msg)
 
 }
