@@ -59,6 +59,12 @@ type Game struct {
 
 	cfg *Config
 
+	// Toggle button for panel
+	toggleButton *ui.Button
+
+	// Restart flag
+	restartRequested bool
+
 	// Timing instrumentation
 	lastUpdateDuration time.Duration
 	lastDrawDuration   time.Duration
@@ -114,7 +120,15 @@ func GetNewGame(ctx context.Context, cfg *Config, system actor.ActorSystem) *Gam
 	widgetDisplayDefense := panel.AddCheckbox("Show Defense Circle", cfg.DisplayDefenseCircle)
 	panel.EndSection()
 
-	return &Game{
+	panel.AddSection("Actions")
+	// We'll set the onclick callback after creating the game
+	restartButton := panel.AddButton("Restart Simulation", nil)
+	panel.EndSection()
+
+	// Create toggle button (positioned at top-left when panel is hidden)
+	toggleButton := ui.NewButton(10, 10, 120, 35, "⚙ Settings", nil)
+
+	game := &Game{
 		ctx:                    ctx,
 		System:                 system,
 		worldPID:               worldPID,
@@ -138,8 +152,21 @@ func GetNewGame(ctx context.Context, cfg *Config, system actor.ActorSystem) *Gam
 		widgetNumBlue:          widgetNumBlue,
 		widgetDisplayDetection: widgetDisplayDetection,
 		widgetDisplayDefense:   widgetDisplayDefense,
+		toggleButton:           toggleButton,
+		restartRequested:       false,
 		cfg:                    cfg,
 	}
+
+	// Set up callbacks now that game exists
+	restartButton.OnClick = func() {
+		game.restartRequested = true
+	}
+
+	toggleButton.OnClick = func() {
+		game.panel.Toggle()
+	}
+
+	return game
 }
 
 func (g *Game) Update() error {
@@ -152,6 +179,17 @@ func (g *Game) Update() error {
 
 	// 1. Update UI Panel
 	g.panel.Update()
+
+	// Update toggle button (only when panel is fully collapsed and not animating)
+	if g.panel.IsCollapsed && g.panel.X == g.panel.TargetX {
+		g.toggleButton.Update()
+	}
+
+	// Check for restart request
+	if g.restartRequested {
+		g.restartSimulation()
+		g.restartRequested = false
+	}
 
 	// 2. Retrieve Latest State (Non-blocking) EARLY, so we can check IsGameOver before ticking
 	select {
@@ -347,6 +385,13 @@ func (g *Game) Draw(screen *ebiten.Image) {
 
 	// 2. Draw UI Panel
 	g.panel.Draw(screen)
+
+	// Draw toggle button when panel is hidden
+	if g.panel.IsCollapsed {
+		g.toggleButton.Draw(screen)
+		ebitenutil.DebugPrintAt(screen, g.toggleButton.Label,
+			int(g.toggleButton.X+15), int(g.toggleButton.Y+12))
+	}
 
 	// 3. Draw the New Stats Bar
 	g.drawStatsBar(screen)
@@ -559,4 +604,42 @@ func generateSprite(design []string, palette map[rune]color.RGBA) *ebiten.Image 
 		}
 	}
 	return img
+}
+
+// restartSimulation stops the current world and spawns a new one with current config
+func (g *Game) restartSimulation() {
+	// Stop current world
+	if g.worldPID != nil {
+		_ = g.worldPID.Shutdown(g.ctx)
+	}
+
+	// Clear trails
+	g.trails = make(map[string][]geometry.Vector2D)
+
+	// Update config with current widget values
+	g.cfg.DetectionRadius = g.widgetDetectionRadius.Value
+	g.cfg.DefenseRadius = g.widgetDefenseRadius.Value
+	g.cfg.ContactRadius = g.widgetContactRadius.Value
+	g.cfg.VisualRange = g.widgetVisualRange.Value
+	g.cfg.ProtectedRange = g.widgetProtectedRange.Value
+	g.cfg.MaxSpeed = g.widgetMaxSpeed.Value
+	g.cfg.MinSpeed = g.widgetMinSpeed.Value
+	g.cfg.Aggression = g.widgetAggression.Value
+	g.cfg.CenteringFactor = g.widgetCenteringFactor.Value
+	g.cfg.AvoidFactor = g.widgetAvoidFactor.Value
+	g.cfg.MatchingFactor = g.widgetMatchingFactor.Value
+	g.cfg.TurnFactor = g.widgetTurnFactor.Value
+	g.cfg.NumRedAtStart = int(g.widgetNumRed.Value)
+	g.cfg.NumBlueAtStart = int(g.widgetNumBlue.Value)
+	g.cfg.DisplayDetectionCircle = g.widgetDisplayDetection.Value
+	g.cfg.DisplayDefenseCircle = g.widgetDisplayDefense.Value
+
+	// Spawn new world
+	worldActor := NewWorldActor(g.snapshotCh, g.cfg)
+	worldPID, err := g.System.Spawn(g.ctx, "world", worldActor)
+	if err != nil {
+		// If spawn fails, keep the old PID
+		return
+	}
+	g.worldPID = worldPID
 }

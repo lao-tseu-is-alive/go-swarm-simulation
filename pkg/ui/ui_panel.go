@@ -30,7 +30,16 @@ type CheckboxWrapper struct {
 }
 
 func (c *CheckboxWrapper) GetHeight() float64 {
-	return c.Size + 5 // Checkbox size + small margin
+	return c.Size + 25 // Checkbox size + label space + margin
+}
+
+// ButtonWrapper wraps Button to implement UIWidget
+type ButtonWrapper struct {
+	*Button
+}
+
+func (b *ButtonWrapper) GetHeight() float64 {
+	return b.Height + 10 // Button height + margin
 }
 
 // UIPanel manages a collection of UI widgets in a scrollable panel
@@ -48,6 +57,14 @@ type UIPanel struct {
 
 	// Section headers
 	sections []PanelSection
+
+	// Slide animation
+	TargetX     float64 // Target X position for animation
+	slideSpeed  float64 // Pixels per frame
+	IsCollapsed bool    // Whether panel is hidden
+
+	// Hide button
+	hideButton *Button
 }
 
 // PanelSection represents a collapsible section in the panel
@@ -60,7 +77,7 @@ type PanelSection struct {
 
 // NewUIPanel creates a new UI panel
 func NewUIPanel(x, y, width, height float64) *UIPanel {
-	return &UIPanel{
+	panel := &UIPanel{
 		X:            x,
 		Y:            y,
 		Width:        width,
@@ -72,7 +89,23 @@ func NewUIPanel(x, y, width, height float64) *UIPanel {
 		BorderColor:  color.RGBA{R: 100, G: 100, B: 110, A: 255},
 		TextColor:    color.RGBA{R: 220, G: 220, B: 220, A: 255},
 		sections:     make([]PanelSection, 0),
+		TargetX:      x,
+		slideSpeed:   20.0,
+		IsCollapsed:  false,
 	}
+
+	// Create hide button (top-right corner of panel)
+	panel.hideButton = NewButton(
+		x+width-30, // Right side
+		y+5,        // Top
+		25, 20,     // Small button
+		"<", // Left arrow (ASCII)
+		func() {
+			panel.Toggle()
+		},
+	)
+
+	return panel
 }
 
 // AddSection adds a section header
@@ -127,6 +160,25 @@ func (p *UIPanel) AddCheckbox(label string, value bool) *Checkbox {
 	return checkbox
 }
 
+// AddButton adds a button widget to the panel
+func (p *UIPanel) AddButton(label string, onClick func()) *Button {
+	yOffset := p.calculateNextYOffset()
+
+	button := NewButton(
+		p.X+10,
+		p.Y+yOffset+20,
+		p.Width-20,
+		30,
+		label,
+		onClick,
+	)
+
+	p.Widgets = append(p.Widgets, &ButtonWrapper{button})
+	p.Labels = append(p.Labels, label)
+
+	return button
+}
+
 // calculateNextYOffset calculates the Y offset for the next widget
 func (p *UIPanel) calculateNextYOffset() float64 {
 	offset := 0.0
@@ -146,6 +198,27 @@ func (p *UIPanel) calculateNextYOffset() float64 {
 
 // Update handles input for all widgets
 func (p *UIPanel) Update() {
+	// Handle slide animation
+	if p.X != p.TargetX {
+		diff := p.TargetX - p.X
+		if diff > 0 {
+			// Sliding right (showing)
+			p.X += p.slideSpeed
+			if p.X > p.TargetX {
+				p.X = p.TargetX
+			}
+		} else {
+			// Sliding left (hiding)
+			p.X -= p.slideSpeed
+			if p.X < p.TargetX {
+				p.X = p.TargetX
+			}
+		}
+
+		// Update widget positions during animation
+		p.updateWidgetPositions()
+	}
+
 	// Handle scroll
 	_, dy := ebiten.Wheel()
 	if dy != 0 {
@@ -168,6 +241,11 @@ func (p *UIPanel) Update() {
 	for _, widget := range p.Widgets {
 		widget.Update()
 	}
+
+	// Update hide button (only when panel is fully visible and not animating)
+	if !p.IsCollapsed && p.X == p.TargetX {
+		p.hideButton.Update()
+	}
 }
 
 // Draw renders the panel and all widgets
@@ -186,6 +264,11 @@ func (p *UIPanel) Draw(screen *ebiten.Image) {
 
 	// Draw title
 	ebitenutil.DebugPrintAt(screen, "Configuration", int(p.X+10), int(p.Y+5))
+
+	// Draw hide button
+	p.hideButton.Draw(screen)
+	ebitenutil.DebugPrintAt(screen, p.hideButton.Label,
+		int(p.hideButton.X+5), int(p.hideButton.Y+3))
 
 	// Draw widgets with clipping and scrolling
 	currentY := p.Y + 30 - p.ScrollOffset
@@ -211,15 +294,32 @@ func (p *UIPanel) Draw(screen *ebiten.Image) {
 
 			// Only draw if visible
 			if currentY >= p.Y-30 && currentY <= p.Y+p.Height {
-				// Draw label
-				ebitenutil.DebugPrintAt(screen, label,
-					int(p.X+10), int(currentY))
+				// Handle different widget types
+				switch w := widget.(type) {
+				case *CheckboxWrapper:
+					// For checkbox: draw checkbox and label on same line
+					p.adjustWidgetPosition(widget, currentY+2)
+					widget.Draw(screen)
+					// Label to the right of checkbox
+					ebitenutil.DebugPrintAt(screen, label,
+						int(p.X+10+w.Size+8), int(currentY))
 
-				// Adjust widget Y position for scrolling
-				p.adjustWidgetPosition(widget, currentY+15)
+				case *ButtonWrapper:
+					// For button: draw button with label centered inside
+					p.adjustWidgetPosition(widget, currentY)
+					widget.Draw(screen)
+					// Label centered in button
+					textOffset := (len(label) * 8) / 2
+					ebitenutil.DebugPrintAt(screen, label,
+						int(p.X+p.Width/2-float64(textOffset)), int(currentY+8))
 
-				// Draw widget
-				widget.Draw(screen)
+				default:
+					// For sliders: draw label above
+					ebitenutil.DebugPrintAt(screen, label,
+						int(p.X+10), int(currentY))
+					p.adjustWidgetPosition(widget, currentY+15)
+					widget.Draw(screen)
+				}
 			}
 
 			currentY += widget.GetHeight()
@@ -240,6 +340,39 @@ func (p *UIPanel) adjustWidgetPosition(widget UIWidget, newY float64) {
 		w.Y = newY
 	case *CheckboxWrapper:
 		w.Y = newY
+	case *ButtonWrapper:
+		w.Y = newY
+	}
+}
+
+// updateWidgetPositions updates all widget X positions during slide animation
+func (p *UIPanel) updateWidgetPositions() {
+	for _, widget := range p.Widgets {
+		switch w := widget.(type) {
+		case *SliderWrapper:
+			w.X = p.X + 10
+		case *CheckboxWrapper:
+			w.X = p.X + 10
+		case *ButtonWrapper:
+			w.X = p.X + 10
+			w.Width = p.Width - 20
+		}
+	}
+
+	// Update hide button position
+	p.hideButton.X = p.X + p.Width - 30
+}
+
+// Toggle slides the panel in or out
+func (p *UIPanel) Toggle() {
+	if p.IsCollapsed {
+		// Show panel
+		p.TargetX = 10
+		p.IsCollapsed = false
+	} else {
+		// Hide panel
+		p.TargetX = -p.Width - 10
+		p.IsCollapsed = true
 	}
 }
 
