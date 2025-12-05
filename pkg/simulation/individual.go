@@ -190,7 +190,7 @@ func (i *Individual) handleConversion(ctx *actor.ReceiveContext, msg *pb.Convert
 }
 
 func (i *Individual) reportState(ctx *actor.ReceiveContext) {
-	i.Log(ctx.ActorSystem(), "%s reportState i.State.Pos %s \tVel: %s", i.ID, i.State.Pos, i.State.Vel)
+	//i.Log(ctx.ActorSystem(), "%s reportState i.State.Pos %s \tVel: %s", i.ID, i.State.Pos, i.State.Vel)
 	state := i.makeState()
 	// Reply to sender (should be World)
 	if ctx.Sender() != nil && ctx.Sender() != ctx.ActorSystem().NoSender() {
@@ -199,7 +199,7 @@ func (i *Individual) reportState(ctx *actor.ReceiveContext) {
 }
 
 func (i *Individual) respondState(ctx *actor.ReceiveContext) {
-	i.Log(ctx.ActorSystem(), "%s respondState i.State.Pos %s \tVel: %s", i.ID, i.State.Pos, i.State.Vel)
+	//i.Log(ctx.ActorSystem(), "%s respondState i.State.Pos %s \tVel: %s", i.ID, i.State.Pos, i.State.Vel)
 	ctx.Response(i.makeState())
 }
 
