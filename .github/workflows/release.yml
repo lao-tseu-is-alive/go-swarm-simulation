@@ -63,18 +63,12 @@ jobs:
           GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -tags=purego -ldflags="$LDFLAGS" -o goSwarmSimulation-linux-amd64 ./cmd/simulation 
           GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -tags=purego -ldflags="$LDFLAGS" -o goSwarmSimulation-windows-amd64.exe ./cmd/simulation
           GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 go build -tags=purego -ldflags="$LDFLAGS" -o goSwarmSimulation-darwin-amd64 ./cmd/simulation
-          GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build -tags=purego -ldflags="$LDFLAGS" -o goSwarmSimulation-linux-arm64 ./cmd/simulation
-          GOOS=windows GOARCH=arm64 CGO_ENABLED=0 go build -tags=purego -ldflags="$LDFLAGS" -o goSwarmSimulation-windows-arm64.exe ./cmd/simulation
-          GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 go build -tags=purego -ldflags="$LDFLAGS" -o goSwarmSimulation-darwin-arm64 ./cmd/simulation
 
       - name: Create Archives
         run: |
           tar -czvf goSwarmSimulation-linux-amd64.tar.gz goSwarmSimulation-linux-amd64
           tar -czvf goSwarmSimulation-darwin-amd64.tar.gz goSwarmSimulation-darwin-amd64
           zip goSwarmSimulation-windows-amd64.zip goSwarmSimulation-windows-amd64.exe
-          tar -czvf goSwarmSimulation-linux-arm64.tar.gz goSwarmSimulation-linux-arm64
-          tar -czvf goSwarmSimulation-darwin-arm64.tar.gz goSwarmSimulation-darwin-arm64
-          zip goSwarmSimulation-windows-arm64.zip goSwarmSimulation-windows-arm64.exe
 
       - name: Calculate Sha256 hash
         run: |
@@ -88,9 +82,6 @@ jobs:
             goSwarmSimulation-linux-amd64.tar.gz
             goSwarmSimulation-darwin-amd64.tar.gz
             goSwarmSimulation-windows-amd64.zip
-            goSwarmSimulation-linux-arm64.tar.gz
-            goSwarmSimulation-darwin-arm64.tar.gz
-            goSwarmSimulation-windows-arm64.zip
             SHA256.txt
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # Automatically provided by GitHub Actions
