@@ -1,12 +1,13 @@
 package simulation
 
 import (
+	"github.com/lao-tseu-is-alive/go-swarm-simulation/pb"
 	"github.com/lao-tseu-is-alive/go-swarm-simulation/pkg/geometry"
 )
 
 type Entity struct {
 	ID    string
-	Color TeamColor
+	Color pb.TeamColor
 	Pos   geometry.Vector2D
 	Vel   geometry.Vector2D
 
@@ -31,8 +32,8 @@ func (e *Entity) DistanceSquaredTo(other *Entity) float64 {
 }
 
 // ToProto converts the clean Entity into the Protobuf "Envelope"
-func (e *Entity) ToProto() *ActorState {
-	return &ActorState{
+func (e *Entity) ToProto() *pb.ActorState {
+	return &pb.ActorState{
 		Id:       e.ID,
 		Color:    e.Color,
 		Position: GeomVector2DToProto(e.Pos),
@@ -42,7 +43,7 @@ func (e *Entity) ToProto() *ActorState {
 
 // UpdateFromProto updates the entity's state from a Protobuf message
 // without allocating new memory.
-func (e *Entity) UpdateFromProto(p *ActorState) {
+func (e *Entity) UpdateFromProto(p *pb.ActorState) {
 	// We assume ID and Color don't change often, but Position/Velocity do.
 	e.Pos = GeomVector2DFromProto(p.Position)
 	e.Vel = GeomVector2DFromProto(p.Velocity)
@@ -112,7 +113,7 @@ func (e *Entity) Seek(target geometry.Vector2D, strength, maxSpeed float64) {
 }
 
 // FromProto (if needed) converts incoming messages back to Entities
-func FromProto(p *ActorState) *Entity {
+func FromProto(p *pb.ActorState) *Entity {
 	return &Entity{
 		ID:    p.Id,
 		Color: p.Color,
@@ -126,8 +127,8 @@ func FromProto(p *ActorState) *Entity {
 // ----------------------------------------------------------------------------
 
 // GeomVector2DToProto converts a Domain Vector2D to a Protobuf Vector message.
-func GeomVector2DToProto(v geometry.Vector2D) *Vector {
-	return &Vector{
+func GeomVector2DToProto(v geometry.Vector2D) *pb.Vector {
+	return &pb.Vector{
 		X: v.X,
 		Y: v.Y,
 	}
@@ -135,7 +136,7 @@ func GeomVector2DToProto(v geometry.Vector2D) *Vector {
 
 // GeomVector2DFromProto converts a Protobuf Vector message to a Domain Vector2D.
 // It handles nil pointers gracefully (returning a zero vector).
-func GeomVector2DFromProto(p *Vector) geometry.Vector2D {
+func GeomVector2DFromProto(p *pb.Vector) geometry.Vector2D {
 	if p == nil {
 		return geometry.Vector2D{X: 0, Y: 0}
 	}

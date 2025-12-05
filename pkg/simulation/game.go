@@ -10,20 +10,38 @@ import (
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
 	"github.com/hajimehoshi/ebiten/v2/vector"
+	"github.com/lao-tseu-is-alive/go-swarm-simulation/pb"
+	"github.com/lao-tseu-is-alive/go-swarm-simulation/pkg/ui"
 	"github.com/tochemey/goakt/v3/actor"
-	"google.golang.org/protobuf/runtime/protoimpl"
 )
 
 type Game struct {
 	ctx        context.Context
 	System     actor.ActorSystem
 	worldPID   *actor.PID
-	snapshotCh chan *WorldSnapshot
-	lastState  *WorldSnapshot
+	snapshotCh chan *pb.WorldSnapshot
+	lastState  *pb.WorldSnapshot
 
 	// UI Controls
-	sliderDetection *Slider
-	sliderDefense   *Slider
+	panel *ui.UIPanel
+
+	// Widget references for easy access
+	widgetDetectionRadius  *ui.Slider
+	widgetDefenseRadius    *ui.Slider
+	widgetContactRadius    *ui.Slider
+	widgetVisualRange      *ui.Slider
+	widgetProtectedRange   *ui.Slider
+	widgetMaxSpeed         *ui.Slider
+	widgetMinSpeed         *ui.Slider
+	widgetAggression       *ui.Slider
+	widgetCenteringFactor  *ui.Slider
+	widgetAvoidFactor      *ui.Slider
+	widgetMatchingFactor   *ui.Slider
+	widgetTurnFactor       *ui.Slider
+	widgetNumRed           *ui.Slider
+	widgetNumBlue          *ui.Slider
+	widgetDisplayDetection *ui.Checkbox
+	widgetDisplayDefense   *ui.Checkbox
 
 	cfg *Config
 
@@ -36,7 +54,7 @@ type Game struct {
 
 func GetNewGame(ctx context.Context, cfg *Config, system actor.ActorSystem) *Game {
 	// 1. Create Channels for communication
-	snapshotCh := make(chan *WorldSnapshot, 10) // Buffer to avoid blocking
+	snapshotCh := make(chan *pb.WorldSnapshot, 10) // Buffer to avoid blocking
 
 	// 2. Spawn World Actor
 	// We pass the channel to the World so it can push updates to us.
@@ -47,29 +65,65 @@ func GetNewGame(ctx context.Context, cfg *Config, system actor.ActorSystem) *Gam
 		panic(fmt.Sprintf("Failed to spawn world: %v", err))
 	}
 
-	// 3. Initialize Sliders
-	// Position them at the top left or wherever you like
-	sDetection := NewSlider(10, 20, 200, "Detection Radius", 0, 200, cfg.DetectionRadius)
-	sDefense := NewSlider(10, 70, 200, "Defense Radius", 0, 200, cfg.DefenseRadius)
+	// 3. Initialize UI Panel with all configuration widgets
+	panel := ui.NewUIPanel(10, 10, 280, float64(cfg.WorldHeight)-20)
+
+	// Add sections and widgets
+	panel.AddSection("Interaction Radii")
+	widgetDetectionRadius := panel.AddSlider("Detection Radius", 10, 300, cfg.DetectionRadius)
+	widgetDefenseRadius := panel.AddSlider("Defense Radius", 10, 300, cfg.DefenseRadius)
+	widgetContactRadius := panel.AddSlider("Contact Radius", 5, 50, cfg.ContactRadius)
+	widgetVisualRange := panel.AddSlider("Visual Range", 10, 150, cfg.VisualRange)
+	widgetProtectedRange := panel.AddSlider("Protected Range", 5, 50, cfg.ProtectedRange)
+	panel.EndSection()
+
+	panel.AddSection("Physics & Behavior")
+	widgetMaxSpeed := panel.AddSlider("Max Speed", 1, 10, cfg.MaxSpeed)
+	widgetMinSpeed := panel.AddSlider("Min Speed", 0.5, 8, cfg.MinSpeed)
+	widgetAggression := panel.AddSlider("Aggression", 0.1, 2.0, cfg.Aggression)
+	panel.EndSection()
+
+	panel.AddSection("Boids Flocking")
+	widgetCenteringFactor := panel.AddSlider("Centering Factor", 0.0001, 0.01, cfg.CenteringFactor)
+	widgetAvoidFactor := panel.AddSlider("Avoid Factor", 0.001, 0.2, cfg.AvoidFactor)
+	widgetMatchingFactor := panel.AddSlider("Matching Factor", 0.001, 0.2, cfg.MatchingFactor)
+	widgetTurnFactor := panel.AddSlider("Turn Factor", 0.05, 1.0, cfg.TurnFactor)
+	panel.EndSection()
+
+	panel.AddSection("Population (Restart Required)")
+	widgetNumRed := panel.AddSlider("Red Actors", 1, 300, float64(cfg.NumRedAtStart))
+	widgetNumBlue := panel.AddSlider("Blue Actors", 1, 1000, float64(cfg.NumBlueAtStart))
+	panel.EndSection()
+
+	panel.AddSection("Visualization")
+	widgetDisplayDetection := panel.AddCheckbox("Show Detection Circle", cfg.DisplayDetectionCircle)
+	widgetDisplayDefense := panel.AddCheckbox("Show Defense Circle", cfg.DisplayDefenseCircle)
+	panel.EndSection()
 
 	return &Game{
-		ctx:        ctx,
-		System:     system,
-		worldPID:   worldPID,
-		snapshotCh: snapshotCh,
-		lastState: &WorldSnapshot{
-			state:         protoimpl.MessageState{},
-			Actors:        nil,
-			RedCount:      0,
-			BlueCount:     0,
-			IsGameOver:    false,
-			Winner:        "",
-			unknownFields: nil,
-			sizeCache:     0,
-		}, // Avoid nil pointer
-		sliderDetection: sDetection,
-		sliderDefense:   sDefense,
-		cfg:             cfg,
+		ctx:                    ctx,
+		System:                 system,
+		worldPID:               worldPID,
+		snapshotCh:             snapshotCh,
+		lastState:              &pb.WorldSnapshot{}, // Avoid nil pointer
+		panel:                  panel,
+		widgetDetectionRadius:  widgetDetectionRadius,
+		widgetDefenseRadius:    widgetDefenseRadius,
+		widgetContactRadius:    widgetContactRadius,
+		widgetVisualRange:      widgetVisualRange,
+		widgetProtectedRange:   widgetProtectedRange,
+		widgetMaxSpeed:         widgetMaxSpeed,
+		widgetMinSpeed:         widgetMinSpeed,
+		widgetAggression:       widgetAggression,
+		widgetCenteringFactor:  widgetCenteringFactor,
+		widgetAvoidFactor:      widgetAvoidFactor,
+		widgetMatchingFactor:   widgetMatchingFactor,
+		widgetTurnFactor:       widgetTurnFactor,
+		widgetNumRed:           widgetNumRed,
+		widgetNumBlue:          widgetNumBlue,
+		widgetDisplayDetection: widgetDisplayDetection,
+		widgetDisplayDefense:   widgetDisplayDefense,
+		cfg:                    cfg,
 	}
 }
 
@@ -81,9 +135,8 @@ func (g *Game) Update() error {
 		g.updateAvg = g.updateAvg*0.95 + float64(g.lastUpdateDuration.Microseconds())/1000.0*0.05
 	}()
 
-	// 1. Update UI Inputs
-	g.sliderDetection.Update()
-	g.sliderDefense.Update()
+	// 1. Update UI Panel
+	g.panel.Update()
 
 	// 2. Retrieve Latest State (Non-blocking) EARLY, so we can check IsGameOver before ticking
 	select {
@@ -95,13 +148,28 @@ func (g *Game) Update() error {
 	// ONLY send a Tick if the game is NOT over.
 	// This effectively "freezes" the simulation in the final state.
 	if !g.lastState.IsGameOver {
-		actor.Tell(g.ctx, g.worldPID, &UpdateConfig{
-			DetectionRadius: g.sliderDetection.Value,
-			DefenseRadius:   g.sliderDefense.Value,
+		// Send all updated configuration values to the world
+		actor.Tell(g.ctx, g.worldPID, &pb.UpdateConfig{
+			DetectionRadius:        g.widgetDetectionRadius.Value,
+			DefenseRadius:          g.widgetDefenseRadius.Value,
+			ContactRadius:          g.widgetContactRadius.Value,
+			VisualRange:            g.widgetVisualRange.Value,
+			ProtectedRange:         g.widgetProtectedRange.Value,
+			MaxSpeed:               g.widgetMaxSpeed.Value,
+			MinSpeed:               g.widgetMinSpeed.Value,
+			Aggression:             g.widgetAggression.Value,
+			CenteringFactor:        g.widgetCenteringFactor.Value,
+			AvoidFactor:            g.widgetAvoidFactor.Value,
+			MatchingFactor:         g.widgetMatchingFactor.Value,
+			TurnFactor:             g.widgetTurnFactor.Value,
+			NumRedAtStart:          int32(g.widgetNumRed.Value),
+			NumBlueAtStart:         int32(g.widgetNumBlue.Value),
+			DisplayDetectionCircle: g.widgetDisplayDetection.Value,
+			DisplayDefenseCircle:   g.widgetDisplayDefense.Value,
 		})
 
 		// Trigger Simulation Step
-		actor.Tell(g.ctx, g.worldPID, &Tick{})
+		actor.Tell(g.ctx, g.worldPID, &pb.Tick{})
 	}
 
 	return nil
@@ -122,14 +190,14 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		boidIndices := make([]uint16, 0, blueCount*3)
 
 		for _, entity := range g.lastState.Actors {
-			if entity.Color == TeamColor_TEAM_RED {
-				if g.cfg.DisplayDetectionCircle {
+			if entity.Color == pb.TeamColor_TEAM_RED {
+				if g.widgetDisplayDetection.Value {
 					clr := color.RGBA{R: 255, G: 50, B: 50, A: 255}
 					vector.StrokeCircle(
 						screen,
 						float32(entity.Position.X),
 						float32(entity.Position.Y),
-						float32(g.sliderDetection.Value),
+						float32(g.widgetDetectionRadius.Value),
 						1,
 						clr,
 						true,
@@ -158,13 +226,13 @@ func (g *Game) Draw(screen *ebiten.Image) {
 				boidIndices = append(boidIndices, baseIdx, baseIdx+1, baseIdx+2)
 
 				// Optional: Draw Defense Radius ring
-				if g.cfg.DisplayDefenseCircle {
+				if g.widgetDisplayDefense.Value {
 					clr := color.RGBA{R: 50, G: 100, B: 255, A: 50}
 					vector.StrokeCircle(
 						screen,
 						float32(entity.Position.X),
 						float32(entity.Position.Y),
-						float32(g.sliderDefense.Value),
+						float32(g.widgetDefenseRadius.Value),
 						1,
 						clr,
 						true,
@@ -179,9 +247,8 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		}
 	}
 
-	// 2. Draw UI
-	g.sliderDetection.Draw(screen)
-	g.sliderDefense.Draw(screen)
+	// 2. Draw UI Panel
+	g.panel.Draw(screen)
 
 	// 3. Draw the New Stats Bar
 	g.drawStatsBar(screen)
@@ -195,15 +262,15 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	}
 
 	// Display timing breakdown for performance analysis
-	msg := fmt.Sprintf("Detection: %.0f\n\n\nDefense: %.0f\n\n\n\nFPS: %.2f\nTPS: %.2f\n\nUpdate: %.2fms\nDraw:   %.2fms\nTotal:  %.2fms",
-		g.sliderDetection.Value,
-		g.sliderDefense.Value,
+	// Display performance stats (moved to right side to avoid overlap with panel)
+	msg := fmt.Sprintf("FPS: %.2f\nTPS: %.2f\n\nUpdate: %.2fms\nDraw:   %.2fms\nTotal:  %.2fms",
 		ebiten.ActualFPS(),
 		ebiten.ActualTPS(),
 		g.updateAvg,
 		g.drawAvg,
 		g.updateAvg+g.drawAvg)
-	ebitenutil.DebugPrint(screen, msg)
+	// Print stats on the right side
+	ebitenutil.DebugPrintAt(screen, msg, int(g.cfg.WorldWidth)-150, 10)
 
 }
 
@@ -285,7 +352,7 @@ func init() {
 	}
 }
 
-func drawBoid(screen *ebiten.Image, b *ActorState) {
+func drawBoid(screen *ebiten.Image, b *pb.ActorState) {
 	angle := math.Atan2(b.Velocity.Y, b.Velocity.X)
 
 	// Visual geometry logic

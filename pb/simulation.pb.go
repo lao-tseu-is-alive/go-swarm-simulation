@@ -4,7 +4,7 @@
 // 	protoc        v6.32.1
 // source: pb/simulation.proto
 
-package simulation
+package pb
 
 import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
@@ -501,13 +501,32 @@ func (x *WorldSnapshot) GetWinner() string {
 	return ""
 }
 
-// UpdateConfig Simple struct to update config (can be moved to proto)
+// UpdateConfig allows runtime updates to all configuration parameters
 type UpdateConfig struct {
-	state           protoimpl.MessageState `protogen:"open.v1"`
-	DetectionRadius float64                `protobuf:"fixed64,1,opt,name=DetectionRadius,proto3" json:"DetectionRadius,omitempty"`
-	DefenseRadius   float64                `protobuf:"fixed64,2,opt,name=DefenseRadius,proto3" json:"DefenseRadius,omitempty"`
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Interaction Radii
+	DetectionRadius float64 `protobuf:"fixed64,1,opt,name=detection_radius,json=detectionRadius,proto3" json:"detection_radius,omitempty"`
+	DefenseRadius   float64 `protobuf:"fixed64,2,opt,name=defense_radius,json=defenseRadius,proto3" json:"defense_radius,omitempty"`
+	ContactRadius   float64 `protobuf:"fixed64,3,opt,name=contact_radius,json=contactRadius,proto3" json:"contact_radius,omitempty"`
+	VisualRange     float64 `protobuf:"fixed64,4,opt,name=visual_range,json=visualRange,proto3" json:"visual_range,omitempty"`
+	ProtectedRange  float64 `protobuf:"fixed64,5,opt,name=protected_range,json=protectedRange,proto3" json:"protected_range,omitempty"`
+	// Physics / Behavior
+	MaxSpeed   float64 `protobuf:"fixed64,6,opt,name=max_speed,json=maxSpeed,proto3" json:"max_speed,omitempty"`
+	MinSpeed   float64 `protobuf:"fixed64,7,opt,name=min_speed,json=minSpeed,proto3" json:"min_speed,omitempty"`
+	Aggression float64 `protobuf:"fixed64,8,opt,name=aggression,proto3" json:"aggression,omitempty"`
+	// Boids Flocking Parameters
+	CenteringFactor float64 `protobuf:"fixed64,9,opt,name=centering_factor,json=centeringFactor,proto3" json:"centering_factor,omitempty"`
+	AvoidFactor     float64 `protobuf:"fixed64,10,opt,name=avoid_factor,json=avoidFactor,proto3" json:"avoid_factor,omitempty"`
+	MatchingFactor  float64 `protobuf:"fixed64,11,opt,name=matching_factor,json=matchingFactor,proto3" json:"matching_factor,omitempty"`
+	TurnFactor      float64 `protobuf:"fixed64,12,opt,name=turn_factor,json=turnFactor,proto3" json:"turn_factor,omitempty"`
+	// Population (for reference, changes take effect on restart)
+	NumRedAtStart  int32 `protobuf:"varint,13,opt,name=num_red_at_start,json=numRedAtStart,proto3" json:"num_red_at_start,omitempty"`
+	NumBlueAtStart int32 `protobuf:"varint,14,opt,name=num_blue_at_start,json=numBlueAtStart,proto3" json:"num_blue_at_start,omitempty"`
+	// Visualization
+	DisplayDetectionCircle bool `protobuf:"varint,15,opt,name=display_detection_circle,json=displayDetectionCircle,proto3" json:"display_detection_circle,omitempty"`
+	DisplayDefenseCircle   bool `protobuf:"varint,16,opt,name=display_defense_circle,json=displayDefenseCircle,proto3" json:"display_defense_circle,omitempty"`
+	unknownFields          protoimpl.UnknownFields
+	sizeCache              protoimpl.SizeCache
 }
 
 func (x *UpdateConfig) Reset() {
@@ -554,6 +573,104 @@ func (x *UpdateConfig) GetDefenseRadius() float64 {
 	return 0
 }
 
+func (x *UpdateConfig) GetContactRadius() float64 {
+	if x != nil {
+		return x.ContactRadius
+	}
+	return 0
+}
+
+func (x *UpdateConfig) GetVisualRange() float64 {
+	if x != nil {
+		return x.VisualRange
+	}
+	return 0
+}
+
+func (x *UpdateConfig) GetProtectedRange() float64 {
+	if x != nil {
+		return x.ProtectedRange
+	}
+	return 0
+}
+
+func (x *UpdateConfig) GetMaxSpeed() float64 {
+	if x != nil {
+		return x.MaxSpeed
+	}
+	return 0
+}
+
+func (x *UpdateConfig) GetMinSpeed() float64 {
+	if x != nil {
+		return x.MinSpeed
+	}
+	return 0
+}
+
+func (x *UpdateConfig) GetAggression() float64 {
+	if x != nil {
+		return x.Aggression
+	}
+	return 0
+}
+
+func (x *UpdateConfig) GetCenteringFactor() float64 {
+	if x != nil {
+		return x.CenteringFactor
+	}
+	return 0
+}
+
+func (x *UpdateConfig) GetAvoidFactor() float64 {
+	if x != nil {
+		return x.AvoidFactor
+	}
+	return 0
+}
+
+func (x *UpdateConfig) GetMatchingFactor() float64 {
+	if x != nil {
+		return x.MatchingFactor
+	}
+	return 0
+}
+
+func (x *UpdateConfig) GetTurnFactor() float64 {
+	if x != nil {
+		return x.TurnFactor
+	}
+	return 0
+}
+
+func (x *UpdateConfig) GetNumRedAtStart() int32 {
+	if x != nil {
+		return x.NumRedAtStart
+	}
+	return 0
+}
+
+func (x *UpdateConfig) GetNumBlueAtStart() int32 {
+	if x != nil {
+		return x.NumBlueAtStart
+	}
+	return 0
+}
+
+func (x *UpdateConfig) GetDisplayDetectionCircle() bool {
+	if x != nil {
+		return x.DisplayDetectionCircle
+	}
+	return false
+}
+
+func (x *UpdateConfig) GetDisplayDefenseCircle() bool {
+	if x != nil {
+		return x.DisplayDefenseCircle
+	}
+	return false
+}
+
 var File_pb_simulation_proto protoreflect.FileDescriptor
 
 const file_pb_simulation_proto_rawDesc = "" +
@@ -591,10 +708,28 @@ const file_pb_simulation_proto_rawDesc = "" +
 	"blue_count\x18\x03 \x01(\x05R\tblueCount\x12 \n" +
 	"\fis_game_over\x18\x04 \x01(\bR\n" +
 	"isGameOver\x12\x16\n" +
-	"\x06winner\x18\x05 \x01(\tR\x06winner\"^\n" +
-	"\fUpdateConfig\x12(\n" +
-	"\x0fDetectionRadius\x18\x01 \x01(\x01R\x0fDetectionRadius\x12$\n" +
-	"\rDefenseRadius\x18\x02 \x01(\x01R\rDefenseRadius*>\n" +
+	"\x06winner\x18\x05 \x01(\tR\x06winner\"\x89\x05\n" +
+	"\fUpdateConfig\x12)\n" +
+	"\x10detection_radius\x18\x01 \x01(\x01R\x0fdetectionRadius\x12%\n" +
+	"\x0edefense_radius\x18\x02 \x01(\x01R\rdefenseRadius\x12%\n" +
+	"\x0econtact_radius\x18\x03 \x01(\x01R\rcontactRadius\x12!\n" +
+	"\fvisual_range\x18\x04 \x01(\x01R\vvisualRange\x12'\n" +
+	"\x0fprotected_range\x18\x05 \x01(\x01R\x0eprotectedRange\x12\x1b\n" +
+	"\tmax_speed\x18\x06 \x01(\x01R\bmaxSpeed\x12\x1b\n" +
+	"\tmin_speed\x18\a \x01(\x01R\bminSpeed\x12\x1e\n" +
+	"\n" +
+	"aggression\x18\b \x01(\x01R\n" +
+	"aggression\x12)\n" +
+	"\x10centering_factor\x18\t \x01(\x01R\x0fcenteringFactor\x12!\n" +
+	"\favoid_factor\x18\n" +
+	" \x01(\x01R\vavoidFactor\x12'\n" +
+	"\x0fmatching_factor\x18\v \x01(\x01R\x0ematchingFactor\x12\x1f\n" +
+	"\vturn_factor\x18\f \x01(\x01R\n" +
+	"turnFactor\x12'\n" +
+	"\x10num_red_at_start\x18\r \x01(\x05R\rnumRedAtStart\x12)\n" +
+	"\x11num_blue_at_start\x18\x0e \x01(\x05R\x0enumBlueAtStart\x128\n" +
+	"\x18display_detection_circle\x18\x0f \x01(\bR\x16displayDetectionCircle\x124\n" +
+	"\x16display_defense_circle\x18\x10 \x01(\bR\x14displayDefenseCircle*>\n" +
 	"\tTeamColor\x12\x14\n" +
 	"\x10TEAM_UNSPECIFIED\x10\x00\x12\f\n" +
 	"\bTEAM_RED\x10\x01\x12\r\n" +

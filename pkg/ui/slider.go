@@ -1,4 +1,4 @@
-package simulation
+package ui
 
 import (
 	"image/color"

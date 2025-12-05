@@ -6,6 +6,7 @@ import (
 	"math/rand/v2"
 	"time"
 
+	"github.com/lao-tseu-is-alive/go-swarm-simulation/pb"
 	"github.com/lao-tseu-is-alive/go-swarm-simulation/pkg/geometry"
 	"github.com/tochemey/goakt/v3/actor"
 	"github.com/tochemey/goakt/v3/goaktpb"
@@ -20,12 +21,12 @@ type WorldActor struct {
 	entities  map[string]*Entity
 	pids      []*actor.PID // Keep track of children
 	pidsCache map[string]*actor.PID
-	uiChannel chan<- *WorldSnapshot
+	uiChannel chan<- *pb.WorldSnapshot
 	// Optimization: Spatial Hashing
 	// Map gridKey -> list of entities in that cell
 	grid map[gridKey][]*Entity
 	// Communication with UI
-	snapshotCh chan<- *WorldSnapshot
+	snapshotCh chan<- *pb.WorldSnapshot
 	// Game Settings (received from UI)
 	detectionRadius float64
 	visualRange     float64 // For friends (Blue seeking Blue)
@@ -38,7 +39,7 @@ type WorldActor struct {
 }
 
 // NewWorldActor creates the world logic unit
-func NewWorldActor(snapshotCh chan<- *WorldSnapshot, cfg *Config) *WorldActor {
+func NewWorldActor(snapshotCh chan<- *pb.WorldSnapshot, cfg *Config) *WorldActor {
 	return &WorldActor{
 		entities:        make(map[string]*Entity),
 		pidsCache:       make(map[string]*actor.PID),
@@ -73,7 +74,7 @@ func (w *WorldActor) Receive(ctx *actor.ReceiveContext) {
 
 	// 1. Handle Updates from Individuals
 	// You might need to add this message to your Proto or use a wrapper
-	case *ActorState:
+	case *pb.ActorState:
 		w.msgRecvCount++
 		if existing, ok := w.entities[msg.Id]; ok {
 			existing.UpdateFromProto(msg)
@@ -83,7 +84,7 @@ func (w *WorldActor) Receive(ctx *actor.ReceiveContext) {
 		}
 
 	// 2. The Main Simulation Step (Driven by Game Loop)
-	case *Tick:
+	case *pb.Tick:
 		// 1. Telemetry
 		w.logBenchmarks(ctx)
 
@@ -94,10 +95,33 @@ func (w *WorldActor) Receive(ctx *actor.ReceiveContext) {
 		// 3. UI Update
 		w.pushSnapshot()
 
-	// Handle dynamic slider updates from UI
-	case *UpdateConfig: // Defined below or in Proto
-		w.detectionRadius = msg.DetectionRadius
-		w.defenseRadius = msg.DefenseRadius
+		// Handle dynamic config updates from UI
+	case *pb.UpdateConfig:
+		// Update radii
+		w.detectionRadius = msg.GetDetectionRadius()
+		w.defenseRadius = msg.GetDefenseRadius()
+		w.visualRange = msg.GetVisualRange()
+
+		// Update config for other parameters (these affect new calculations)
+		w.cfg.DetectionRadius = msg.GetDetectionRadius()
+		w.cfg.DefenseRadius = msg.GetDefenseRadius()
+		w.cfg.ContactRadius = msg.GetContactRadius()
+		w.cfg.VisualRange = msg.GetVisualRange()
+		w.cfg.ProtectedRange = msg.GetProtectedRange()
+		w.cfg.MaxSpeed = msg.GetMaxSpeed()
+		w.cfg.MinSpeed = msg.GetMinSpeed()
+		w.cfg.Aggression = msg.GetAggression()
+		w.cfg.CenteringFactor = msg.GetCenteringFactor()
+		w.cfg.AvoidFactor = msg.GetAvoidFactor()
+		w.cfg.MatchingFactor = msg.GetMatchingFactor()
+		w.cfg.TurnFactor = msg.GetTurnFactor()
+		w.cfg.DisplayDetectionCircle = msg.GetDisplayDetectionCircle()
+		w.cfg.DisplayDefenseCircle = msg.GetDisplayDefenseCircle()
+
+		// Note: Population parameters (NumRedAtStart, NumBlueAtStart)
+		// are stored but require a simulation restart to take effect
+		w.cfg.NumRedAtStart = int(msg.GetNumRedAtStart())
+		w.cfg.NumBlueAtStart = int(msg.GetNumBlueAtStart())
 	}
 }
 
@@ -139,9 +163,9 @@ func (w *WorldActor) broadcastSimulationStep(ctx *actor.ReceiveContext, dt int64
 		enemies, friends := w.scanNeighbors(ctx, me, ranges)
 
 		// 2. Construct the enriched Tick
-		individualTick := &Tick{
+		individualTick := &pb.Tick{
 			DeltaTime: dt,
-			Context: &Perception{
+			Context: &pb.Perception{
 				Targets: enemies,
 				Friends: friends,
 			},
@@ -157,9 +181,9 @@ func (w *WorldActor) broadcastSimulationStep(ctx *actor.ReceiveContext, dt int64
 
 // scanNeighbors iterates the spatial grid around 'me'.
 // It populates perception lists AND handles combat interactions inline for efficiency.
-func (w *WorldActor) scanNeighbors(ctx *actor.ReceiveContext, me *Entity, ranges struct{ perceptionSq, detectionSq, contactSq float64 }) ([]*ActorState, []*ActorState) {
-	var visibleEnemies []*ActorState
-	var visibleFriends []*ActorState
+func (w *WorldActor) scanNeighbors(ctx *actor.ReceiveContext, me *Entity, ranges struct{ perceptionSq, detectionSq, contactSq float64 }) ([]*pb.ActorState, []*pb.ActorState) {
+	var visibleEnemies []*pb.ActorState
+	var visibleFriends []*pb.ActorState
 
 	// Get grid bounds for the largest relevant radius (usually Detection or Perception)
 	gx, gy := w.getCellIndices(me.Pos.X, me.Pos.Y)
@@ -191,13 +215,13 @@ func (w *WorldActor) scanNeighbors(ctx *actor.ReceiveContext, me *Entity, ranges
 					if distSq < ranges.detectionSq {
 						visibleEnemies = append(visibleEnemies, other.ToProto())
 					}
+				}
 
-					// Combat Logic: Red attacks Blue
-					// We check this here to avoid re-iterating neighbors later
-					if me.Color == TeamColor_TEAM_RED && other.Color == TeamColor_TEAM_BLUE {
-						if distSq < ranges.contactSq {
-							w.resolveCombat(ctx, me, other)
-						}
+				// Combat Logic: Red attacks Blue
+				// We check this here to avoid re-iterating neighbors later
+				if me.Color == pb.TeamColor_TEAM_RED && other.Color == pb.TeamColor_TEAM_BLUE {
+					if distSq < ranges.contactSq {
+						w.resolveCombat(ctx, me, other)
 					}
 				}
 			}
@@ -212,23 +236,23 @@ func (w *WorldActor) resolveCombat(ctx *actor.ReceiveContext, attacker, victim *
 	defenders := w.countFriendsInRadius(
 		victim.Pos,
 		w.defenseRadius,
-		TeamColor_TEAM_BLUE, // Target is Blue defenders
-		victim.ID,           // Exclude the victim themselves
+		pb.TeamColor_TEAM_BLUE, // Target is Blue defenders
+		victim.ID,              // Exclude the victim themselves
 	)
 
 	if defenders >= 3 {
 		// Defense Success: Attacker converts to Blue
-		w.sendConvert(ctx, attacker.ID, TeamColor_TEAM_BLUE)
+		w.sendConvert(ctx, attacker.ID, pb.TeamColor_TEAM_BLUE)
 	} else {
 		// Defense Failed: Victim converts to Red
-		w.sendConvert(ctx, victim.ID, TeamColor_TEAM_RED)
+		w.sendConvert(ctx, victim.ID, pb.TeamColor_TEAM_RED)
 	}
 }
 
-func (w *WorldActor) sendConvert(ctx *actor.ReceiveContext, targetID string, newColor TeamColor) {
+func (w *WorldActor) sendConvert(ctx *actor.ReceiveContext, targetID string, newColor pb.TeamColor) {
 	if pid := w.pidsCache[targetID]; pid != nil {
 		w.msgSentCount++
-		ctx.Tell(pid, &Convert{TargetColor: newColor})
+		ctx.Tell(pid, &pb.Convert{TargetColor: newColor})
 	}
 }
 
@@ -259,7 +283,7 @@ func (w *WorldActor) spawnSwarm(ctx *actor.ReceiveContext) {
 		vx := (rand.Float64() - 0.5) * 2
 		vy := (rand.Float64() - 0.5) * 2
 
-		pid := ctx.Spawn(name, NewIndividual(TeamColor_TEAM_RED, startX, startY, vx, vy, w.cfg))
+		pid := ctx.Spawn(name, NewIndividual(pb.TeamColor_TEAM_RED, startX, startY, vx, vy, w.cfg))
 		w.pids = append(w.pids, pid)
 		w.pidsCache[name] = pid
 
@@ -267,7 +291,7 @@ func (w *WorldActor) spawnSwarm(ctx *actor.ReceiveContext) {
 		// sees it and sends it a message.
 		w.entities[name] = &Entity{
 			ID:    name,
-			Color: TeamColor_TEAM_RED,
+			Color: pb.TeamColor_TEAM_RED,
 			Pos: geometry.Vector2D{
 				X: startX,
 				Y: startY,
@@ -295,13 +319,13 @@ func (w *WorldActor) spawnSwarm(ctx *actor.ReceiveContext) {
 		vx := (rand.Float64() - 0.5) * 2
 		vy := (rand.Float64() - 0.5) * 2
 
-		pid := ctx.Spawn(name, NewIndividual(TeamColor_TEAM_BLUE, startX, startY, vx, vy, w.cfg))
+		pid := ctx.Spawn(name, NewIndividual(pb.TeamColor_TEAM_BLUE, startX, startY, vx, vy, w.cfg))
 		w.pids = append(w.pids, pid)
 		w.pidsCache[name] = pid
 
 		w.entities[name] = &Entity{
 			ID:    name,
-			Color: TeamColor_TEAM_BLUE,
+			Color: pb.TeamColor_TEAM_BLUE,
 			Pos: geometry.Vector2D{
 				X: startX,
 				Y: startY,
@@ -370,8 +394,8 @@ func (w *WorldActor) sendPerceptionUpdates(ctx *actor.ReceiveContext) {
 	for _, entity := range w.entities {
 		nearby := w.getNearbyActors(entity.Pos.X, entity.Pos.Y)
 
-		var visibleEnemies []*ActorState
-		var visibleFriends []*ActorState
+		var visibleEnemies []*pb.ActorState
+		var visibleFriends []*pb.ActorState
 
 		for _, other := range nearby {
 			if other.ID == entity.ID {
@@ -394,7 +418,7 @@ func (w *WorldActor) sendPerceptionUpdates(ctx *actor.ReceiveContext) {
 		// Send fresh perception BEFORE they move
 		if pid, ok := w.pidsCache[entity.ID]; ok {
 			w.msgSentCount++ // COUNT PERCEPTION MSG
-			ctx.Tell(pid, &Perception{
+			ctx.Tell(pid, &pb.Perception{
 				Targets: visibleEnemies,
 				Friends: visibleFriends,
 			})
@@ -408,14 +432,14 @@ func (w *WorldActor) processInteractions(ctx *actor.ReceiveContext) {
 
 	// Only iterate Red entities to avoid double-processing
 	for _, attacker := range w.entities {
-		if attacker.Color != TeamColor_TEAM_RED {
+		if attacker.Color != pb.TeamColor_TEAM_RED {
 			continue // Skip Blues
 		}
 
 		nearby := w.getNearbyActors(attacker.Pos.X, attacker.Pos.Y)
 
 		for _, victim := range nearby {
-			if victim.Color != TeamColor_TEAM_BLUE {
+			if victim.Color != pb.TeamColor_TEAM_BLUE {
 				continue // Only attack Blues
 			}
 
@@ -428,7 +452,7 @@ func (w *WorldActor) processInteractions(ctx *actor.ReceiveContext) {
 			defenders := w.countFriendsInRadius(
 				victim.Pos,
 				w.defenseRadius,
-				TeamColor_TEAM_BLUE,
+				pb.TeamColor_TEAM_BLUE,
 				victim.ID,
 			)
 
@@ -437,29 +461,29 @@ func (w *WorldActor) processInteractions(ctx *actor.ReceiveContext) {
 				// Defense success: Convert attacker
 				if pid := w.pidsCache[attacker.ID]; pid != nil {
 					w.msgSentCount++ // <--- COUNT CONVERT MSG
-					ctx.Tell(pid, &Convert{TargetColor: TeamColor_TEAM_BLUE})
+					ctx.Tell(pid, &pb.Convert{TargetColor: pb.TeamColor_TEAM_BLUE})
 				}
 			} else {
 				// Defense failed: Convert victim
 				if pid := w.pidsCache[victim.ID]; pid != nil {
 					w.msgSentCount++ // <--- COUNT CONVERT MSG
-					ctx.Tell(pid, &Convert{TargetColor: TeamColor_TEAM_RED})
+					ctx.Tell(pid, &pb.Convert{TargetColor: pb.TeamColor_TEAM_RED})
 				}
 			}
 		}
 	}
 }
 
-func (w *WorldActor) buildSnapshot() *WorldSnapshot {
-	snapshot := &WorldSnapshot{
-		Actors:    make([]*ActorState, 0, len(w.entities)),
+func (w *WorldActor) buildSnapshot() *pb.WorldSnapshot {
+	snapshot := &pb.WorldSnapshot{
+		Actors:    make([]*pb.ActorState, 0, len(w.entities)),
 		RedCount:  0,
 		BlueCount: 0,
 	}
 
 	for _, state := range w.entities {
 		snapshot.Actors = append(snapshot.Actors, state.ToProto())
-		if state.Color == TeamColor_TEAM_RED {
+		if state.Color == pb.TeamColor_TEAM_RED {
 			snapshot.RedCount++
 		} else {
 			snapshot.BlueCount++
@@ -487,7 +511,7 @@ func (w *WorldActor) PostStop(ctx *actor.Context) error {
 
 // countFriendsInRadius returns the count of entities of 'targetColor' within 'radius', excluding 'excludeID'.
 // It performs 0 allocations.
-func (w *WorldActor) countFriendsInRadius(center geometry.Vector2D, radius float64, targetColor TeamColor, excludeID string) int {
+func (w *WorldActor) countFriendsInRadius(center geometry.Vector2D, radius float64, targetColor pb.TeamColor, excludeID string) int {
 	radiusSq := radius * radius
 	cellSize := w.getCellSize()
 

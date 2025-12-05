@@ -4,6 +4,7 @@ import (
 	"math"
 	"math/rand"
 
+	"github.com/lao-tseu-is-alive/go-swarm-simulation/pb"
 	"github.com/lao-tseu-is-alive/go-swarm-simulation/pkg/geometry"
 	"github.com/tochemey/goakt/v3/actor"
 	"github.com/tochemey/goakt/v3/goaktpb"
@@ -17,14 +18,14 @@ const (
 type Individual struct {
 	ID             string
 	State          *Entity
-	visibleTargets []*ActorState // Enemies
-	visibleFriends []*ActorState // Allies
+	visibleTargets []*pb.ActorState // Enemies
+	visibleFriends []*pb.ActorState // Allies
 	cfg            *Config
 }
 
 var _ actor.Actor = (*Individual)(nil)
 
-func NewIndividual(color TeamColor, startX, startY, vx, vy float64, cfg *Config) *Individual {
+func NewIndividual(color pb.TeamColor, startX, startY, vx, vy float64, cfg *Config) *Individual {
 	return &Individual{
 		State: &Entity{
 			// ID set in PreStart or derived later
@@ -59,7 +60,7 @@ func (i *Individual) PostStop(ctx *actor.Context) error {
 
 func (i *Individual) Receive(ctx *actor.ReceiveContext) {
 	// Route to appropriate behavior based on current color
-	if i.State.Color == TeamColor_TEAM_RED {
+	if i.State.Color == pb.TeamColor_TEAM_RED {
 		ctx.Become(i.RedBehavior)
 		i.RedBehavior(ctx)
 	} else {
@@ -80,7 +81,7 @@ func (i *Individual) RedBehavior(ctx *actor.ReceiveContext) {
 		i.State.ID = i.ID // <--- FIX: Ensure State has the ID
 		i.Log(ctx.ActorSystem(), "%s started in RED mode", i.ID)
 
-	case *Tick:
+	case *pb.Tick:
 		// EXTRACT PERCEPTION
 		if msg.Context != nil {
 			i.visibleTargets = msg.Context.Targets
@@ -89,10 +90,10 @@ func (i *Individual) RedBehavior(ctx *actor.ReceiveContext) {
 		i.updateAsRed()
 		i.reportState(ctx)
 
-	case *Convert:
+	case *pb.Convert:
 		i.handleConversion(ctx, msg)
 
-	case *GetState:
+	case *pb.GetState:
 		i.respondState(ctx)
 
 	default:
@@ -127,7 +128,7 @@ func (i *Individual) BlueBehavior(ctx *actor.ReceiveContext) {
 		i.State.ID = i.ID // <--- FIX: Ensure State has the ID
 		i.Log(ctx.ActorSystem(), "%s started in BLUE mode", i.ID)
 
-	case *Tick:
+	case *pb.Tick:
 		// EXTRACT PERCEPTION
 		if msg.Context != nil {
 			i.visibleTargets = msg.Context.Targets
@@ -136,10 +137,10 @@ func (i *Individual) BlueBehavior(ctx *actor.ReceiveContext) {
 		i.updateAsBlue()
 		i.reportState(ctx)
 
-	case *Convert:
+	case *pb.Convert:
 		i.handleConversion(ctx, msg)
 
-	case *GetState:
+	case *pb.GetState:
 		i.respondState(ctx)
 
 	default:
@@ -162,7 +163,7 @@ func (i *Individual) updateAsBlue() {
 // Shared Behaviors
 // ============================================================================
 
-func (i *Individual) handleConversion(ctx *actor.ReceiveContext, msg *Convert) {
+func (i *Individual) handleConversion(ctx *actor.ReceiveContext, msg *pb.Convert) {
 	if msg.TargetColor == i.State.Color {
 		return // Already this color
 	}
@@ -174,7 +175,7 @@ func (i *Individual) handleConversion(ctx *actor.ReceiveContext, msg *Convert) {
 		ctx.Self().Name(), oldColor, i.State.Color)
 
 	// Switch behavior function
-	if i.State.Color == TeamColor_TEAM_RED {
+	if i.State.Color == pb.TeamColor_TEAM_RED {
 		ctx.Become(i.RedBehavior)
 	} else {
 		ctx.Become(i.BlueBehavior)
@@ -202,7 +203,7 @@ func (i *Individual) respondState(ctx *actor.ReceiveContext) {
 	ctx.Response(i.makeState())
 }
 
-func (i *Individual) makeState() *ActorState {
+func (i *Individual) makeState() *pb.ActorState {
 	return i.State.ToProto()
 }
 
@@ -216,7 +217,7 @@ func (i *Individual) chaseClosestTarget() {
 	}
 
 	// Find nearest enemy
-	var closest *ActorState
+	var closest *pb.ActorState
 	minDistSq := math.MaxFloat64
 
 	for _, target := range i.visibleTargets {

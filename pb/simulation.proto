@@ -54,8 +54,31 @@ message WorldSnapshot {
   string winner = 5;
 }
 
-// UpdateConfig Simple struct to update config (can be moved to proto)
+// UpdateConfig allows runtime updates to all configuration parameters
 message UpdateConfig {
-	double DetectionRadius = 1;
-	double DefenseRadius   = 2;
+	// Interaction Radii
+	double detection_radius = 1;
+	double defense_radius = 2;
+	double contact_radius = 3;
+	double visual_range = 4;
+	double protected_range = 5;
+	
+	// Physics / Behavior
+	double max_speed = 6;
+	double min_speed = 7;
+	double aggression = 8;
+	
+	// Boids Flocking Parameters
+	double centering_factor = 9;
+	double avoid_factor = 10;
+	double matching_factor = 11;
+	double turn_factor = 12;
+	
+	// Population (for reference, changes take effect on restart)
+	int32 num_red_at_start = 13;
+	int32 num_blue_at_start = 14;
+	
+	// Visualization
+	bool display_detection_circle = 15;
+	bool display_defense_circle = 16;
 }

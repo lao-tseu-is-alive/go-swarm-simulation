@@ -1,9 +1,12 @@
 package simulation
 
-import "github.com/lao-tseu-is-alive/go-swarm-simulation/pkg/geometry"
+import (
+	"github.com/lao-tseu-is-alive/go-swarm-simulation/pb"
+	"github.com/lao-tseu-is-alive/go-swarm-simulation/pkg/geometry"
+)
 
 // ComputeBoidUpdate calculates the new velocity based on boids rules
-func ComputeBoidUpdate(me *Entity, friends []*ActorState, cfg *Config) geometry.Vector2D {
+func ComputeBoidUpdate(me *Entity, friends []*pb.ActorState, cfg *Config) geometry.Vector2D {
 	force := geometry.Vector2D{}
 
 	// Initialize force accumulators
