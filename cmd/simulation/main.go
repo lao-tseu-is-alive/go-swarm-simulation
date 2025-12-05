@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
 	"io"
 	stdLog "log"
 	"os"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/lao-tseu-is-alive/go-swarm-simulation/pkg/simulation"
+	"github.com/lao-tseu-is-alive/go-swarm-simulation/pkg/version"
 	"github.com/tochemey/goakt/v3/actor"
 	"github.com/tochemey/goakt/v3/log"
 	"go.uber.org/zap"
@@ -59,6 +61,7 @@ func main() {
 		}
 		defer pprof.StopCPUProfile()
 	}
+	fmt.Printf("🚀 Starting App:'%s', ver:%s, BuildStamp: %s, Repo: %s\n", version.APP, version.VERSION, version.BuildStamp, version.REPOSITORY)
 
 	ctx := context.Background()
 	// Load Config
