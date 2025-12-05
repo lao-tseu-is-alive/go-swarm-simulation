@@ -17,6 +17,10 @@ jobs:
     runs-on: ubuntu-latest # Use ubuntu-latest to build, as it supports cross-compilation
 
     steps:
+      - name: Install Linux Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgl1-mesa-dev libxcursor-dev libxi-dev libxinerama-dev libxrandr-dev libxxf86vm-dev libasound2-dev libc6-dev libgl1-mesa-dev libxcursor-dev libxi-dev libxinerama-dev libxrandr-dev libxxf86vm-dev libasound2-dev pkg-config
       - name: Checkout code
         uses: actions/checkout@v4 # Action to checkout your repository code
       - name: Set env
