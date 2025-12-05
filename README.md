@@ -1,25 +1,43 @@
 # 🐝 Go Swarm Simulation
 
-> **A graphical experiment in decentralized decision-making using the Actor Model (GoAkt) and Ebitengine.**
+> **Red Virus vs Blue Flock …Convert or Be Converted 🦠🚀**
+> 
 
 ## 🌟 Overview
 
 **Go Swarm Simulation** is a "Game of Life on steroids" that demonstrates the power of the **Actor Model** for building concurrent, decentralized systems.
 
+*A graphical experiment in decentralized decision-making using the Actor Model (GoAkt) and Ebitengine.*
+
 Instead of a central controller managing the state of every entity, each individual dot in this world is an autonomous **Actor** running in its own goroutine. They possess their own state, personality, and decision-making logic.
+The simulation visualizes two distinct behaviors interacting in a 2D world.
 
-The simulation visualizes two distinct behaviors interacting in a 2D world:
 
-* 🔴 **Red Swarm (Aggressive):** Fast-moving chasers that hunt down other actors.
-* 🔵 **Blue Swarm (Consensual):** Flock together using **Boids** algorithms (Cohesion, Alignment, Separation).
+# 
+
+![demo gif placeholder]()
+*(live demo – 25 red vs 250 blue boids tiny spaceships fighting for ideological supremacy)*
+
+A real-time, visually polished swarm simulation in Go where **Red aggressive hunters** try to infect **Blue flocking prey**.  
+One side uses raw pursuit and conversion, the other relies on classic Boids rules + safety-in-numbers.  
+Watch emergent strategies appear: defensive circles, sacrifice plays, collapse waves, and total extinction events.
+
+Pure Go • GoAkt actors • Ebitengine • Zero shared mutable state • Live-tunable parameters
 
 ## 🚀 Features
 
-* **Actor Model Architecture:** Built on [GoAkt](https://github.com/Tochemey/goakt), utilizing Protocol Buffers for high-performance message passing.
+* **100 % Actor Model Architecture:** Built on [GoAkt](https://github.com/Tochemey/goakt), (no central "God object", no locks)
+* **ProtoBuf**  Utilizing Protocol Buffers for high-performance message passing.
 * **Spatial Hashing:** Optimized neighbor lookups using a spatial grid, allowing for efficient O(1) interaction checks even with large populations.
-* **Dynamic Behavior Switching:** Actors change their internal message handling logic at runtime using `ctx.Become()` (e.g., switching from "Aggressive" to "Flocking" upon conversion).
+* **Dynamic Behavior Switching:** True hot behavior swapping via `ctx.Become()` – actors literally change personality-switch when converted.
 * **Flocking Behaviors:** Implementation of Reynolds' Boids algorithm for realistic group movement.
 * **Real-Time Visualization:** Renders thousands of concurrent updates smoothly using [Ebitengine](https://ebitengine.org/).
+* Full live UI control panel (collapsible, animated, 20+ sliders & checkboxes)
+- External `config.json` + JSON Schema validation
+- Pre-rendered ASCII-art spaceships with glow trails (because why not
+- Hot restart, profiling flags, clean shutdown
+- Zero-allocation perception queries
+- Ready for future GoAkt clustering (just flip a switch)
 
 ## 🛠️ Architecture
 
@@ -79,13 +97,6 @@ Launch the main actor-based simulation:
 go run cmd/simulation/main.go
 ```
 
-### 4. Run the Standalone Boids Demo
-
-If you want to see the pure flocking algorithm in action (without the Actor Model overhead), run the lightweight boids demo:
-
-```bash
-go run cmd/boids/main.go
-```
 
 ## 📂 Project Structure
 
@@ -93,10 +104,10 @@ go run cmd/boids/main.go
 .
 ├── cmd/
 │   ├── simulation/      # Main entry point (Ebiten Game Loop)
-│   └── boids/           # Standalone Boids Algorithm Demo
 ├── pkg/
 │   ├── simulation/      # Core Actor Logic (World, Individual)
-│   └── behavior/        # Boids Flocking Logic
+│   ├── ui/              # Ui widgets for ebitten (buttons,sliders...)
+│   └── geometry/        # Some helper for Vector handling
 ├── pb/                  # Protobuf definitions
 ├── scripts/             # Helper scripts
 └── go.mod
@@ -141,9 +152,62 @@ func (i *Individual) BlueBehavior(ctx *actor.ReceiveContext) {
 }
 ```
 
+
+
+
+## Quick Start
+
+```bash
+git clone https://github.com/lao-tseu-is-alive/go-swarm-simulation.git
+cd go-swarm-simulation
+
+# First run – generates a sane default config.json + schema
+go run .
+
+# Or tweak everything live with the sliders
+go run .
+
+# CPU / memory profiling
+go run . -cpuprofile cpu.pprof -memprofile mem.pprof
+```
+
+## Controls
+
+- Move the mouse → interact with the left slide-in panel
+- Click the `<` button top-right of panel hide/show it
+- Change any slider apply new values and click **Restart** see the chaos unfold again
+- All parameters are hot-reloaded on restart (no recompile needed)
+
+## Tech Highlights
+
+| Area                  | Implementation                                                                 |
+|-----------------------|--------------------------------------------------------------------------------|
+| Concurrency           | GoAkt v3 actors – each creature is an independent goroutine                       |
+| Perception            | World pushes visible friends/targets every tick – no actor ever queries the world |
+| Spatial partitioning   | Rebuilt grid every frame, zero-allocation radius queries                           |
+| Rendering             | Ebitengine + pre-rendered 5×5 pixel spaceships from ASCII art + soft trails       |
+| UI                    | Hand-rolled animated collapsible panel with sliders, checkboxes and sections      |
+| Configuration          | `config.json` validated against `config_schema.json` – enterprise-grade            |
+
+## Roadmap / Dreams
+
+- [ ] GoAkt remoting → 50 k+ actors across multiple machines
+- [ ] Headless replay server + GIF export
+- [ ] WASM build (yes, it runs in the browser)
+- [ ] Genetic evolution of parameters (watch new strategies evolve)
+- [ ] Obstacles, resources, multiple factions
+
+## Credits & Thanks
+
+- GoAkt – https://github.com/tochemey/goakt
+- Ebitengine – https://ebitengine.org
+- Spaceship ASCII art stolen from my 12-year-old self’s notebook
+- Window title proudly suggested by Grok 4.1
+
 ## 🤝 Contributing
 
-Contributions are welcome! If you want to add new behaviors (e.g., "Green" actors that chase "Red" ones) or improve the rendering performance:
+PRs or any contributions are welcome!
+ *· May your flock hold the line (or may it dramatically fail — both are fun).*
 
 1.  Fork the Project
 2.  Create your Feature Branch (`git checkout -b feature/AmazingFeature`)
@@ -157,4 +221,4 @@ Distributed under the MIT License. See `LICENSE` for more information.
 
 -----
 
-*Built with ❤️ using [GoAkt](https://github.com/Tochemey/goakt) and [Ebitengine](https://ebitengine.org/)*
+*Built with ❤️ by Lao-Tseu-is-Alive in 2025 using [GoAkt](https://github.com/Tochemey/goakt) and [Ebitengine](https://ebitengine.org/)*
