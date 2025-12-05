@@ -11,6 +11,7 @@ import (
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
 	"github.com/hajimehoshi/ebiten/v2/vector"
 	"github.com/lao-tseu-is-alive/go-swarm-simulation/pb"
+	"github.com/lao-tseu-is-alive/go-swarm-simulation/pkg/geometry"
 	"github.com/lao-tseu-is-alive/go-swarm-simulation/pkg/ui"
 	"github.com/tochemey/goakt/v3/actor"
 )
@@ -20,8 +21,10 @@ var (
 	whiteImage    = ebiten.NewImage(3, 3)
 	redSpaceship  *ebiten.Image
 	blueSpaceship *ebiten.Image
-	spaceshipSize = 16.0 // The new sprite is 16x16
+	trailSprite   *ebiten.Image
 )
+
+const drawTrails = false
 
 type Game struct {
 	ctx        context.Context
@@ -29,6 +32,9 @@ type Game struct {
 	worldPID   *actor.PID
 	snapshotCh chan *pb.WorldSnapshot
 	lastState  *pb.WorldSnapshot
+
+	// trails will store trail history: Map[ActorID] -> List of Positions
+	trails map[string][]geometry.Vector2D
 
 	// UI Controls
 	panel *ui.UIPanel
@@ -114,6 +120,7 @@ func GetNewGame(ctx context.Context, cfg *Config, system actor.ActorSystem) *Gam
 		worldPID:               worldPID,
 		snapshotCh:             snapshotCh,
 		lastState:              &pb.WorldSnapshot{}, // Avoid nil pointer
+		trails:                 make(map[string][]geometry.Vector2D),
 		panel:                  panel,
 		widgetDetectionRadius:  widgetDetectionRadius,
 		widgetDefenseRadius:    widgetDefenseRadius,
@@ -150,6 +157,7 @@ func (g *Game) Update() error {
 	select {
 	case snap := <-g.snapshotCh:
 		g.lastState = snap
+		g.updateTrails(snap)
 	default:
 		// Use previous state if new one isn't ready
 	}
@@ -194,6 +202,84 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	if g.lastState != nil {
 		for _, entity := range g.lastState.Actors {
 			if entity.Color == pb.TeamColor_TEAM_RED {
+				if drawTrails {
+					// --- 1. NEW: Draw Glowing Trail ---
+					if trace, ok := g.trails[entity.Id]; ok && len(trace) > 1 {
+						for i, pos := range trace {
+							// Calculate progress (0.0 = tail, 1.0 = engine)
+							p := float64(i) / float64(len(trace))
+
+							// Size varies: 0 at tail, 6 at engine
+							radius := float32(3.0 * p)
+
+							// Color Logic: Fire Gradient
+							// Tail is Red/Transparent, Head is Yellow/White
+							var r, gr, b, a uint8
+							if p > 0.8 {
+								// Core (White/Yellow)
+								r, gr, b, a = 255, 255, 100, 200
+							} else if p > 0.5 {
+								// Middle (Orange)
+								r, gr, b, a = 255, 140, 0, 150
+							} else {
+								// Tail (Red fading out)
+								r, gr, b, a = 255, 0, 0, uint8(100*p)
+							}
+
+							// Draw the puff
+							vector.FillCircle(screen, float32(pos.X), float32(pos.Y), radius, color.RGBA{R: r, G: gr, B: b, A: a}, true)
+						}
+					}
+				} else {
+					// --- 1. OPTIMIZED: Draw Glowing Trail (Sprite Batching) ---
+					if trace, ok := g.trails[entity.Id]; ok && len(trace) > 1 {
+						// Re-use a single Options struct to avoid allocation overhead in the loop
+						trailOp := &ebiten.DrawImageOptions{}
+
+						// Center of the 8x8 sprite
+						originOffset := 4.0
+
+						for i, pos := range trace {
+							// Progress: 0.0 (Tail) -> 1.0 (Engine)
+							p := float64(i) / float64(len(trace))
+
+							// Skip the very tail if it's too faint
+							if p < 0.2 {
+								continue
+							}
+
+							trailOp.GeoM.Reset()
+							trailOp.ColorScale.Reset()
+
+							// 1. Scale:
+							// Start small (0.5), grow to 1.5 at the engine
+							scale := 0.5 + p
+							trailOp.GeoM.Translate(-originOffset, -originOffset) // Center pivot
+							trailOp.GeoM.Scale(scale, scale)
+							trailOp.GeoM.Translate(pos.X, pos.Y) // Move to world position
+
+							// 2. Color Logic (Fire Gradient):
+							// We use ColorScale to tint the white sprite.
+							// High alpha at head, fading to 0 at tail.
+							alpha := float32(p * 0.8) // Max opacity 0.8
+
+							if p > 0.8 {
+								// White/Yellow Core
+								trailOp.ColorScale.Scale(1, 1, 0.5, alpha)
+							} else if p > 0.5 {
+								// Orange Body
+								trailOp.ColorScale.Scale(1, 0.5, 0, alpha)
+							} else {
+								// Red/Smoke Tail
+								trailOp.ColorScale.Scale(0.8, 0, 0, alpha)
+							}
+
+							screen.DrawImage(trailSprite, trailOp)
+						}
+					}
+				}
+
+				// --- 2. Existing Detection Circle (Keep this) ---
 				if g.widgetDisplayDetection.Value {
 					clr := color.RGBA{R: 255, G: 50, B: 50, A: 255}
 					vector.StrokeCircle(
@@ -338,10 +424,47 @@ func (g *Game) drawStatsBar(screen *ebiten.Image) {
 	ebitenutil.DebugPrintAt(screen, blueMsg, int(x+barWidth-textOffset), int(y+barHeight+5))
 }
 
+// Add this new method to pkg/simulation/game.go
+func (g *Game) updateTrails(snap *pb.WorldSnapshot) {
+	// Track which IDs are currently Red so we can delete trails for dead/converted actors
+	activeRedIDs := make(map[string]bool)
+
+	for _, a := range snap.Actors {
+		if a.Color == pb.TeamColor_TEAM_RED {
+			activeRedIDs[a.Id] = true
+
+			// Convert Proto Vector to Geometry Vector
+			pos := geometry.Vector2D{X: a.Position.X, Y: a.Position.Y}
+
+			// Append to history
+			if list, ok := g.trails[a.Id]; ok {
+				g.trails[a.Id] = append(list, pos)
+			} else {
+				g.trails[a.Id] = []geometry.Vector2D{pos}
+			}
+
+			// Limit trail length (e.g., keep last 20 frames)
+			maxLen := 20
+			if len(g.trails[a.Id]) > maxLen {
+				g.trails[a.Id] = g.trails[a.Id][1:]
+			}
+		}
+	}
+
+	// Cleanup: Remove trails for actors that are no longer Red
+	for id := range g.trails {
+		if !activeRedIDs[id] {
+			delete(g.trails, id)
+		}
+	}
+}
+
 func (g *Game) Layout(w, h int) (int, int) { return int(g.cfg.WorldWidth), int(g.cfg.WorldHeight) }
 
 func init() {
 	whiteImage.Fill(color.RGBA{R: 100, G: 200, B: 255, A: 255})
+
+	// --- RED Sprite Design
 	// Legend:
 	// . = Transparent
 	// G = Green (Glass/Dome)
@@ -397,6 +520,29 @@ func init() {
 	}
 
 	blueSpaceship = generateSprite(blueDesign, bluePalette)
+
+	// ---  Pre-render a "Soft Puff" for the trail ---
+	// A small 8x8 white circle with alpha gradient (so it looks like glowing gas)
+	trailSprite = ebiten.NewImage(8, 8)
+	cx, cy := 3.5, 3.5
+	r := 3.5
+
+	// Scan pixels to create a radial gradient
+	for y := 0; y < 8; y++ {
+		for x := 0; x < 8; x++ {
+			dx := float64(x) - cx
+			dy := float64(y) - cy
+			dist := math.Sqrt(dx*dx + dy*dy)
+
+			if dist < r {
+				// Alpha fades out towards edge
+				alpha := 1.0 - (dist / r)
+				// Use pure white so we can tint it later with ColorScale
+				c := uint8(255 * alpha)
+				trailSprite.Set(x, y, color.RGBA{R: 255, G: 255, B: 255, A: c})
+			}
+		}
+	}
 }
 
 // generateSprite converts an ASCII grid into an Ebiten image
@@ -413,43 +559,4 @@ func generateSprite(design []string, palette map[rune]color.RGBA) *ebiten.Image 
 		}
 	}
 	return img
-}
-func drawBoid(screen *ebiten.Image, b *pb.ActorState) {
-	angle := math.Atan2(b.Velocity.Y, b.Velocity.X)
-
-	// Visual geometry logic
-	tipX := b.Position.X + math.Cos(angle)*6
-	tipY := b.Position.Y + math.Sin(angle)*6
-	rightX := b.Position.X + math.Cos(angle+2.5)*5
-	rightY := b.Position.Y + math.Sin(angle+2.5)*5
-	leftX := b.Position.X + math.Cos(angle-2.5)*5
-	leftY := b.Position.Y + math.Sin(angle-2.5)*5
-
-	// Define the 3 vertices of the triangle
-	vertices := []ebiten.Vertex{
-		{
-			DstX: float32(tipX),
-			DstY: float32(tipY),
-			SrcX: 1, SrcY: 1,
-			ColorR: 1, ColorG: 1, ColorB: 1, ColorA: 1,
-		},
-		{
-			DstX: float32(rightX),
-			DstY: float32(rightY),
-			SrcX: 1, SrcY: 1,
-			ColorR: 1, ColorG: 1, ColorB: 1, ColorA: 1,
-		},
-		{
-			DstX: float32(leftX),
-			DstY: float32(leftY),
-			SrcX: 1, SrcY: 1,
-			ColorR: 1, ColorG: 1, ColorB: 1, ColorA: 1,
-		},
-	}
-
-	indices := []uint16{0, 1, 2}
-
-	op := &ebiten.DrawTrianglesOptions{}
-
-	screen.DrawTriangles(vertices, indices, whiteImage, op)
 }
