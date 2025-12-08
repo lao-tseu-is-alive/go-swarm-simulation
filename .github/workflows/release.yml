@@ -1,4 +1,4 @@
-name: Release
+name: Linux Release
 
 on:
   push:
@@ -20,7 +20,7 @@ jobs:
       - name: Install Linux Dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libgl1-mesa-dev libxcursor-dev libxi-dev libxinerama-dev libxrandr-dev libxxf86vm-dev libasound2-dev libc6-dev libgl1-mesa-dev libxcursor-dev libxi-dev libxinerama-dev libxrandr-dev libxxf86vm-dev libasound2-dev pkg-config
+          sudo apt-get install -y gcc libc6-dev libgl1-mesa-dev libxcursor-dev libxi-dev libxinerama-dev libxrandr-dev libxxf86vm-dev libasound2-dev pkg-config
       - name: Checkout code
         uses: actions/checkout@v4 # Action to checkout your repository code
       - name: Set env
@@ -62,12 +62,10 @@ jobs:
           # CGO_ENABLED=0: Disable CGO for static linking (recommended for portability)
           go mod tidy
           GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build  -ldflags="$LDFLAGS" -o goSwarmSimulation-linux-amd64 ./cmd/simulation 
-          GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -tags=purego -ldflags="$LDFLAGS" -o goSwarmSimulation-windows-amd64.exe ./cmd/simulation
 
       - name: Create Archives
         run: |
           tar -czvf goSwarmSimulation-linux-amd64.tar.gz goSwarmSimulation-linux-amd64
-          zip goSwarmSimulation-windows-amd64.zip goSwarmSimulation-windows-amd64.exe
 
       - name: Calculate Sha256 hash
         run: |
@@ -79,7 +77,6 @@ jobs:
           body:  Release${{ env.RELEASE_VERSION }}
           files: |
             goSwarmSimulation-linux-amd64.tar.gz
-            goSwarmSimulation-windows-amd64.zip
             SHA256.txt
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # Automatically provided by GitHub Actions
