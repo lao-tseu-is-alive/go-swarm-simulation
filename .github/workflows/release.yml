@@ -51,7 +51,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5 # Action to set up the Go environment
         with:
-          go-version: '1.24.5' # Specify the Go version you want to use
+          go-version: '1.25.5' # Specify the Go version you want to use
       - run: go version
 
       - name: Build
@@ -61,14 +61,12 @@ jobs:
           # GOARCH: target architecture
           # CGO_ENABLED=0: Disable CGO for static linking (recommended for portability)
           go mod tidy
-          GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -tags=purego -ldflags="$LDFLAGS" -o goSwarmSimulation-linux-amd64 ./cmd/simulation 
-          GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -tags=purego -ldflags="$LDFLAGS" -o goSwarmSimulation-windows-amd64.exe ./cmd/simulation
-          GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 go build -tags=purego -ldflags="$LDFLAGS" -o goSwarmSimulation-darwin-amd64 ./cmd/simulation
+          GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build  -ldflags="$LDFLAGS" -o goSwarmSimulation-linux-amd64 ./cmd/simulation 
+          GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build  -ldflags="$LDFLAGS" -o goSwarmSimulation-windows-amd64.exe ./cmd/simulation
 
       - name: Create Archives
         run: |
           tar -czvf goSwarmSimulation-linux-amd64.tar.gz goSwarmSimulation-linux-amd64
-          tar -czvf goSwarmSimulation-darwin-amd64.tar.gz goSwarmSimulation-darwin-amd64
           zip goSwarmSimulation-windows-amd64.zip goSwarmSimulation-windows-amd64.exe
 
       - name: Calculate Sha256 hash
@@ -81,7 +79,6 @@ jobs:
           body:  Release${{ env.RELEASE_VERSION }}
           files: |
             goSwarmSimulation-linux-amd64.tar.gz
-            goSwarmSimulation-darwin-amd64.tar.gz
             goSwarmSimulation-windows-amd64.zip
             SHA256.txt
         env:

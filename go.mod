@@ -3,7 +3,7 @@ module github.com/lao-tseu-is-alive/go-swarm-simulation
 go 1.25.4
 
 require (
-	github.com/hajimehoshi/ebiten/v2 v2.9.4
+	github.com/hajimehoshi/ebiten/v2 v2.9.5
 	github.com/santhosh-tekuri/jsonschema/v5 v5.3.1
 	github.com/tochemey/goakt/v3 v3.9.9
 	go.uber.org/zap v1.27.1

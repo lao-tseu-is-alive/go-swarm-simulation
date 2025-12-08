@@ -3,7 +3,7 @@ package version
 var (
 	APP        = "goSwarmSimulation"
 	AppSnake   = "go-swarm-simulation"
-	VERSION    = "0.1.4"
+	VERSION    = "0.1.5"
 	REPOSITORY = "https://github.com/lao-tseu-is-alive/go-swarm-simulation"
 	REVISION   = "unknown"
 	BuildStamp = "unknown"
