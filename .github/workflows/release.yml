@@ -62,7 +62,7 @@ jobs:
           # CGO_ENABLED=0: Disable CGO for static linking (recommended for portability)
           go mod tidy
           GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build  -ldflags="$LDFLAGS" -o goSwarmSimulation-linux-amd64 ./cmd/simulation 
-          GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build  -ldflags="$LDFLAGS" -o goSwarmSimulation-windows-amd64.exe ./cmd/simulation
+          GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -tags=purego -ldflags="$LDFLAGS" -o goSwarmSimulation-windows-amd64.exe ./cmd/simulation
 
       - name: Create Archives
         run: |
