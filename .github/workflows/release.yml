@@ -1,82 +1,140 @@
-name: Linux Release
+name: Release
 
 on:
   push:
-    # Publish semver tags as releases.
-    tags: [ 'v[0-9]+.[0-9]+.[0-9]+' ]
-
+    tags: ['v[0-9]+.[0-9]+.[0-9]+']
 
 permissions:
-  contents: write # Grant write access to repository contents
-  actions: read # Grant read access to repository actions
-  discussions: read # Grant read access to repository discussions
+  contents: write   # needed for creating the release and uploading assets
 
 jobs:
   build:
-    name: Build and Release
-    runs-on: ubuntu-latest # Use ubuntu-latest to build, as it supports cross-compilation
+    strategy:
+      matrix:
+        include:
+          # Linux amd64 (native build on Ubuntu)
+          - name: linux-amd64
+            os: ubuntu-latest
+            goos: linux
+            goarch: amd64
+            cgo: 1
+            tags: ""
+            binary_name: goSwarmSimulation-linux-amd64
+
+          # Windows amd64 (cross-compile, purego = no cgo)
+          - name: windows-amd64
+            os: ubuntu-latest
+            goos: windows
+            goarch: amd64
+            cgo: 0
+            tags: purego
+            binary_name: goSwarmSimulation-windows-amd64.exe
+
+          # macOS amd64 (native build on macOS runner)
+          - name: darwin-amd64
+            os: macos-latest
+            goos: darwin
+            goarch: amd64
+            cgo: 1
+            tags: ""
+            binary_name: goSwarmSimulation-darwin-amd64
+
+          # macOS arm64 (Apple Silicon) – optional, remove if you don't need it
+          - name: darwin-arm64
+            os: macos-latest
+            goos: darwin
+            goarch: arm64
+            cgo: 1
+            tags: ""
+            binary_name: goSwarmSimulation-darwin-arm64
+
+    name: Build ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
 
     steps:
-      - name: Install Linux Dependencies
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.5'
+
+      - name: Install Linux dependencies (only on Ubuntu)
+        if: matrix.os == 'ubuntu-latest'
         run: |
           sudo apt-get update
-          sudo apt-get install -y gcc libc6-dev libgl1-mesa-dev libxcursor-dev libxi-dev libxinerama-dev libxrandr-dev libxxf86vm-dev libasound2-dev pkg-config
-      - name: Checkout code
-        uses: actions/checkout@v4 # Action to checkout your repository code
-      - name: Set env
+          sudo apt-get install -y libgl1-mesa-dev libxcursor-dev libxi-dev \
+                                  libxinerama-dev libxrandr-dev libxxf86vm-dev \
+                                  libasound2-dev pkg-config
+
+      - name: Set environment variables
         run: |
-          echo "RELEASE_VERSION=${GITHUB_REF#refs/*/}" >> $GITHUB_ENV
+          echo "RELEASE_VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
           echo "REVISION=$(git describe --dirty --always)" >> $GITHUB_ENV
-          echo "NOW=$(date +%Y-%m-%dT%T)" >> $GITHUB_ENV
-          echo "APP_REPOSITORY=github.com/${GITHUB_REPOSITORY}" >> $GITHUB_ENV
-          
+          echo "NOW=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> $GITHUB_ENV
+          echo "APP_REPOSITORY=github.com/${{ github.repository }}" >> $GITHUB_ENV
+
       - name: Compose LDFLAGS
         run: |
-          LDFLAGS="-s -w -X ${APP_REPOSITORY}/pkg/version.BuildStamp=${NOW} -X ${APP_REPOSITORY}/pkg/version.REVISION=${REVISION}"
+          LDFLAGS="-s -w -X ${{ env.APP_REPOSITORY }}/pkg/version.BuildStamp=${{ env.NOW }} -X ${{ env.APP_REPOSITORY }}/pkg/version.REVISION=${{ env.REVISION }}"
           echo "LDFLAGS=$LDFLAGS" >> $GITHUB_ENV
-        env:
-          APP_REPOSITORY: ${{ env.APP_REPOSITORY }}
-          NOW: ${{ env.NOW }}
-          REVISION: ${{ env.REVISION }}
-          
-      - name: Show LDFLAGS
-        run: echo "$LDFLAGS"
-        env:
-          LDFLAGS: ${{ env.LDFLAGS }}
-      
-      - name: Preparing Test Env
-        run: |
-          echo $RELEASE_VERSION
-          echo ${{ env.RELEASE_VERSION }}   
-      - name: Setup Go
-        uses: actions/setup-go@v5 # Action to set up the Go environment
-        with:
-          go-version: '1.25.5' # Specify the Go version you want to use
-      - run: go version
 
-      - name: Build
+      - name: Build binary
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: ${{ matrix.cgo }}
         run: |
-          # Set environment variables for cross-compilation
-          # GOOS: target operating system
-          # GOARCH: target architecture
-          # CGO_ENABLED=0: Disable CGO for static linking (recommended for portability)
           go mod tidy
-          GOOS=linux GOARCH=amd64 CGO_ENABLED=1 go build  -ldflags="$LDFLAGS" -o goSwarmSimulation-linux-amd64 ./cmd/simulation 
+          tags="${{ matrix.tags }}"
+          tag_arg=""
+          [ -n "$tags" ] && tag_arg="-tags=$tags"
+          go build $tag_arg -ldflags="$LDFLAGS" -o ${{ matrix.binary_name }} ./cmd/simulation
 
-      - name: Create Archives
+      - name: Create archive
         run: |
-          tar -czvf goSwarmSimulation-linux-amd64.tar.gz goSwarmSimulation-linux-amd64
+          if [[ "${{ matrix.goos }}" == "windows" ]]; then
+            zip ${{ matrix.binary_name }}.zip ${{ matrix.binary_name }}
+          else
+            tar -czvf ${{ matrix.binary_name }}.tar.gz ${{ matrix.binary_name }}
+          fi
 
-      - name: Calculate Sha256 hash
-        run: |
-          sha256sum goSwarmSimulation-* > SHA256.txt
-
-      - name: Upload Release Asset for Linux/macOS
-        uses: softprops/action-gh-release@v2.2.2
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
         with:
-          body:  Release${{ env.RELEASE_VERSION }}
+          name: ${{ matrix.binary_name }}-archive
+          path: |
+            ${{ matrix.binary_name }}*
+          retention-days: 1
+
+  release:
+    name: Create GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Flatten and list artifacts
+        run: |
+          find artifacts -type f -exec mv {} . \;
+          ls -lh
+
+      - name: Compute SHA256 checksums
+        run: |
+          sha256sum *.tar.gz *.zip > SHA256.txt
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          body: |
+            Release ${{ github.ref_name }}
           files: |
-            goSwarmSimulation-linux-amd64.tar.gz
+            *.tar.gz
+            *.zip
             SHA256.txt
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # Automatically provided by GitHub Actions
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
