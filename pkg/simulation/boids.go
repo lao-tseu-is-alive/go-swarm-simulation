@@ -5,16 +5,27 @@ import (
 	"github.com/lao-tseu-is-alive/go-swarm-simulation/pkg/geometry"
 )
 
-// ComputeBoidUpdate calculates the new velocity based on boids rules
-func ComputeBoidUpdate(me *Entity, friends []*pb.ActorState, cfg *Config) geometry.Vector2D {
+// ComputeBoidUpdate calculates the new velocity based on boids rules.
+// Config values are passed as parameters to avoid shared state.
+func ComputeBoidUpdate(
+	me *Entity,
+	friends []*pb.ActorState,
+	flockVision float64,
+	personalSpace float64,
+	cohesion float64,
+	separation float64,
+	alignment float64,
+) geometry.Vector2D {
 	force := geometry.Vector2D{}
 
 	// Initialize force accumulators
-	// ... accumulators (can use Vectors now!) ...
 	avgVel := geometry.Vector2D{}
 	avgPos := geometry.Vector2D{}
-	separation := geometry.Vector2D{}
+	separationForce := geometry.Vector2D{}
 	neighbors := 0.0
+
+	flockVisionSq := flockVision * flockVision
+	personalSpaceSq := personalSpace * personalSpace
 
 	for _, a := range friends {
 		other := Entity{
@@ -24,35 +35,35 @@ func ComputeBoidUpdate(me *Entity, friends []*pb.ActorState, cfg *Config) geomet
 			Vel:   GeomVector2DFromProto(a.Velocity),
 		}
 		distSq := me.Pos.DistanceSquaredTo(other.Pos)
-		// 1. Separation
-		if distSq < cfg.BluePersonalSpace*cfg.BluePersonalSpace {
-			// Push away: (me - other)
+
+		// 1. Separation - push away if too close
+		if distSq < personalSpaceSq {
 			diff := me.Pos.Sub(other.Pos)
-			separation = separation.Add(diff)
+			separationForce = separationForce.Add(diff)
 		}
 
-		// Check visual range for Cohesion/Alignment
-		if distSq < cfg.BlueFlockVision*cfg.BlueFlockVision {
+		// 2. Check visual range for Cohesion/Alignment
+		if distSq < flockVisionSq {
 			avgVel = avgVel.Add(other.Vel)
 			avgPos = avgPos.Add(other.Pos)
 			neighbors++
 		}
 	}
 
-	// Apply Separation weights
-	force = force.Add(separation.Mul(cfg.BlueSeparation))
+	// Apply Separation force
+	force = force.Add(separationForce.Mul(separation))
 
-	// Apply Alignment and Cohesion
+	// Apply Alignment and Cohesion only if we have neighbors
 	if neighbors > 0 {
-		avgVel, _ = avgVel.Div(neighbors) // Error handling ignored for brevity (neighbors > 0)
-		// Alignment: (AvgVel - MyVel) * Factor
-		align := avgVel.Sub(me.Vel).Mul(cfg.BlueAlignment)
+		avgVel, _ = avgVel.Div(neighbors)
+		// Alignment: steer towards average velocity
+		align := avgVel.Sub(me.Vel).Mul(alignment)
 		force = force.Add(align)
 
 		avgPos, _ = avgPos.Div(neighbors)
-		// Cohesion: (AvgPos - MyPos) * Factor
-		cohesion := avgPos.Sub(me.Pos).Mul(cfg.BlueCohesion)
-		force = force.Add(cohesion)
+		// Cohesion: steer towards average position
+		cohesionForce := avgPos.Sub(me.Pos).Mul(cohesion)
+		force = force.Add(cohesionForce)
 	}
 
 	return force

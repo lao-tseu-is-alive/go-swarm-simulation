@@ -15,16 +15,43 @@ const (
 	ColorBlue = "🔵 BLUE"
 )
 
+// Individual represents an actor in the simulation.
+// Config values are OWNED (not shared) to avoid race conditions.
+// Updates are received via pb.UpdateConfig messages from World.
 type Individual struct {
 	ID             string
 	State          *Entity
 	visibleTargets []*pb.ActorState // Enemies
 	visibleFriends []*pb.ActorState // Allies
-	cfg            *Config
+
+	// =========================================================================
+	// OWNED CONFIG VALUES (not shared pointer)
+	// These are updated via pb.UpdateConfig messages from World
+	// =========================================================================
+
+	// World dimensions
+	worldWidth  float64
+	worldHeight float64
+
+	// Red actor parameters
+	redAggression float64
+
+	// Blue actor (boids) parameters
+	blueFlockVision   float64
+	bluePersonalSpace float64
+	blueCohesion      float64
+	blueSeparation    float64
+	blueAlignment     float64
+	blueEdgeAvoidance float64
+
+	// Shared physics
+	maxSpeed float64
+	minSpeed float64
 }
 
 var _ actor.Actor = (*Individual)(nil)
 
+// NewIndividual creates a new Individual with initial config values copied from cfg.
 func NewIndividual(color pb.TeamColor, startX, startY, vx, vy float64, cfg *Config) *Individual {
 	return &Individual{
 		State: &Entity{
@@ -33,7 +60,18 @@ func NewIndividual(color pb.TeamColor, startX, startY, vx, vy float64, cfg *Conf
 			Pos:   geometry.Vector2D{X: startX, Y: startY},
 			Vel:   geometry.Vector2D{X: vx, Y: vy},
 		},
-		cfg: cfg,
+		// Copy config values at creation time
+		worldWidth:        cfg.WorldWidth,
+		worldHeight:       cfg.WorldHeight,
+		redAggression:     cfg.RedAggression,
+		blueFlockVision:   cfg.BlueFlockVision,
+		bluePersonalSpace: cfg.BluePersonalSpace,
+		blueCohesion:      cfg.BlueCohesion,
+		blueSeparation:    cfg.BlueSeparation,
+		blueAlignment:     cfg.BlueAlignment,
+		blueEdgeAvoidance: cfg.BlueEdgeAvoidance,
+		maxSpeed:          cfg.MaxSpeed,
+		minSpeed:          cfg.MinSpeed,
 	}
 }
 
@@ -90,6 +128,9 @@ func (i *Individual) RedBehavior(ctx *actor.ReceiveContext) {
 		i.updateAsRed()
 		i.reportState(ctx)
 
+	case *pb.UpdateConfig:
+		i.applyConfigUpdate(msg)
+
 	case *pb.Convert:
 		i.handleConversion(ctx, msg)
 
@@ -113,8 +154,7 @@ func (i *Individual) updateAsRed() {
 		i.State.Vel = i.State.Vel.Add(jitter)
 	}
 	i.State.UpdatePhysics() // Pos += Vel
-	i.State.ClampVelocity(i.cfg.MinSpeed, i.cfg.MaxSpeed)
-	i.State.BounceOffWalls(i.cfg.WorldWidth, i.cfg.WorldHeight)
+	i.State.BounceOffWalls(i.worldWidth, i.worldHeight)
 }
 
 // ============================================================================
@@ -138,6 +178,9 @@ func (i *Individual) BlueBehavior(ctx *actor.ReceiveContext) {
 		i.updateAsBlue()
 		i.reportState(ctx)
 
+	case *pb.UpdateConfig:
+		i.applyConfigUpdate(msg)
+
 	case *pb.Convert:
 		i.handleConversion(ctx, msg)
 
@@ -150,12 +193,44 @@ func (i *Individual) BlueBehavior(ctx *actor.ReceiveContext) {
 }
 
 func (i *Individual) updateAsBlue() {
-	// Apply boids flocking rules
-	force := ComputeBoidUpdate(i.State, i.visibleFriends, i.cfg)
+	// Apply boids flocking rules using owned config values
+	force := ComputeBoidUpdate(
+		i.State,
+		i.visibleFriends,
+		i.blueFlockVision,
+		i.bluePersonalSpace,
+		i.blueCohesion,
+		i.blueSeparation,
+		i.blueAlignment,
+	)
+
 	i.State.Vel = i.State.Vel.Add(force) // Apply force
-	i.State.SoftBoundaries(i.cfg.WorldWidth, i.cfg.WorldHeight, i.cfg.BlueEdgeAvoidance)
-	i.State.ClampVelocity(i.cfg.MinSpeed, i.cfg.MaxSpeed)
+	i.State.SoftBoundaries(i.worldWidth, i.worldHeight, i.blueEdgeAvoidance)
+	i.State.ClampVelocity(i.minSpeed, i.maxSpeed)
 	i.State.UpdatePhysics()
+}
+
+// ============================================================================
+// Config Update Handler
+// ============================================================================
+
+// applyConfigUpdate updates owned config values from a pb.UpdateConfig message.
+// This is the only way config values change after actor creation.
+func (i *Individual) applyConfigUpdate(msg *pb.UpdateConfig) {
+	// Red params
+	i.redAggression = msg.GetAggression()
+
+	// Blue params
+	i.blueFlockVision = msg.GetVisualRange()
+	i.bluePersonalSpace = msg.GetProtectedRange()
+	i.blueCohesion = msg.GetCenteringFactor()
+	i.blueSeparation = msg.GetAvoidFactor()
+	i.blueAlignment = msg.GetMatchingFactor()
+	i.blueEdgeAvoidance = msg.GetTurnFactor()
+
+	// Shared physics
+	i.maxSpeed = msg.GetMaxSpeed()
+	i.minSpeed = msg.GetMinSpeed()
 }
 
 // ============================================================================
@@ -189,7 +264,6 @@ func (i *Individual) handleConversion(ctx *actor.ReceiveContext, msg *pb.Convert
 }
 
 func (i *Individual) reportState(ctx *actor.ReceiveContext) {
-	//i.Log(ctx.ActorSystem(), "%s reportState i.State.Pos %s \tVel: %s", i.ID, i.State.Pos, i.State.Vel)
 	state := i.makeState()
 	// Reply to sender (should be World)
 	if ctx.Sender() != nil && ctx.Sender() != ctx.ActorSystem().NoSender() {
@@ -198,7 +272,6 @@ func (i *Individual) reportState(ctx *actor.ReceiveContext) {
 }
 
 func (i *Individual) respondState(ctx *actor.ReceiveContext) {
-	//i.Log(ctx.ActorSystem(), "%s respondState i.State.Pos %s \tVel: %s", i.ID, i.State.Pos, i.State.Vel)
 	ctx.Response(i.makeState())
 }
 
@@ -237,14 +310,14 @@ func (i *Individual) chaseClosestTarget() {
 	length := i.State.Pos.DistanceTo(GeomVector2DFromProto(closest.Position))
 
 	if length > 0 {
-		pursuit = pursuit.Normalize().Mul(i.cfg.RedAggression)
+		pursuit = pursuit.Normalize().Mul(i.redAggression)
 		i.State.Vel = i.State.Vel.Add(pursuit)
 	}
 
 	// Cap at max speed
 	speed := i.State.Vel.Len()
-	if speed > i.cfg.MaxSpeed {
-		scale := i.cfg.MaxSpeed / speed
+	if speed > i.maxSpeed {
+		scale := i.maxSpeed / speed
 		i.State.Vel = i.State.Vel.Mul(scale)
 	}
 }

@@ -97,12 +97,12 @@ func (w *WorldActor) Receive(ctx *actor.ReceiveContext) {
 
 		// Handle dynamic config updates from UI
 	case *pb.UpdateConfig:
-		// Update radii
+		// Update World's own radii (used for spatial queries)
 		w.detectionRadius = msg.GetDetectionRadius()
 		w.defenseRadius = msg.GetDefenseRadius()
 		w.visualRange = msg.GetVisualRange()
 
-		// Update config for other parameters (these affect new calculations)
+		// Update World's config copy (used for spawning new actors)
 		w.cfg.RedDetectionRange = msg.GetDetectionRadius()
 		w.cfg.BlueDefenseRange = msg.GetDefenseRadius()
 		w.cfg.RedAttackRange = msg.GetContactRadius()
@@ -118,10 +118,16 @@ func (w *WorldActor) Receive(ctx *actor.ReceiveContext) {
 		w.cfg.DisplayDetectionCircle = msg.GetDisplayDetectionCircle()
 		w.cfg.DisplayDefenseCircle = msg.GetDisplayDefenseCircle()
 
-		// Note: Population parameters (NumRedAtStart, NumBlueAtStart)
-		// are stored but require a simulation restart to take effect
+		// Population params (require restart)
 		w.cfg.NumRedAtStart = int(msg.GetNumRedAtStart())
 		w.cfg.NumBlueAtStart = int(msg.GetNumBlueAtStart())
+
+		// BROADCAST to all Individual actors so they update their local copies
+		// This is the key to avoiding race conditions - config flows via messages
+		for _, pid := range w.pids {
+			w.msgSentCount++
+			ctx.Tell(pid, msg)
+		}
 	}
 }
 
