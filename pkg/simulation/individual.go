@@ -11,7 +11,9 @@ import (
 )
 
 const (
-	ColorRed  = "🔴 RED"
+	// ColorRed is the display name for Red team actors (hunters).
+	ColorRed = "🔴 RED"
+	// ColorBlue is the display name for Blue team actors (flock).
 	ColorBlue = "🔵 BLUE"
 )
 
@@ -79,6 +81,8 @@ func NewIndividual(color pb.TeamColor, startX, startY, vx, vy float64, cfg *Conf
 // Actor Lifecycle Hooks
 // ============================================================================
 
+// PreStart initializes the Individual when the actor starts.
+// It sets the ID from the actor name and logs the birth.
 func (i *Individual) PreStart(ctx *actor.Context) error {
 	i.ID = ctx.ActorName()
 	i.State.ID = i.ID // <--- FIX: Ensure State has the ID
@@ -87,6 +91,8 @@ func (i *Individual) PreStart(ctx *actor.Context) error {
 	return nil
 }
 
+// PostStop is called when the actor is stopping.
+// It logs the death of the actor.
 func (i *Individual) PostStop(ctx *actor.Context) error {
 	i.Log(ctx.ActorSystem(), "Death: %s", ctx.ActorName())
 	return nil
@@ -96,6 +102,8 @@ func (i *Individual) PostStop(ctx *actor.Context) error {
 // Message Routing (Entry Point)
 // ============================================================================
 
+// Receive is the initial message handler before behavior is determined.
+// It routes to RedBehavior or BlueBehavior based on the actor's current color.
 func (i *Individual) Receive(ctx *actor.ReceiveContext) {
 	// Route to appropriate behavior based on current color
 	if i.State.Color == pb.TeamColor_TEAM_RED {
@@ -111,6 +119,8 @@ func (i *Individual) Receive(ctx *actor.ReceiveContext) {
 // RED BEHAVIOR: Aggressive Hunter
 // ============================================================================
 
+// RedBehavior handles messages when the actor is on the Red (hunter) team.
+// Red actors chase Blue targets and use hard wall collisions.
 func (i *Individual) RedBehavior(ctx *actor.ReceiveContext) {
 	switch msg := ctx.Message().(type) {
 
@@ -142,6 +152,7 @@ func (i *Individual) RedBehavior(ctx *actor.ReceiveContext) {
 	}
 }
 
+// updateAsRed performs Red actor physics: chase targets or wander.
 func (i *Individual) updateAsRed() {
 	if len(i.visibleTargets) > 0 {
 		i.chaseClosestTarget()
@@ -161,6 +172,8 @@ func (i *Individual) updateAsRed() {
 // BLUE BEHAVIOR: Flocking Prey
 // ============================================================================
 
+// BlueBehavior handles messages when the actor is on the Blue (flock) team.
+// Blue actors use boids flocking rules and soft edge avoidance.
 func (i *Individual) BlueBehavior(ctx *actor.ReceiveContext) {
 	switch msg := ctx.Message().(type) {
 
@@ -192,6 +205,7 @@ func (i *Individual) BlueBehavior(ctx *actor.ReceiveContext) {
 	}
 }
 
+// updateAsBlue performs Blue actor physics: boids flocking behavior.
 func (i *Individual) updateAsBlue() {
 	// Apply boids flocking rules using owned config values
 	force := ComputeBoidUpdate(
@@ -237,6 +251,8 @@ func (i *Individual) applyConfigUpdate(msg *pb.UpdateConfig) {
 // Shared Behaviors
 // ============================================================================
 
+// handleConversion switches the actor to a new team color.
+// It changes behavior, applies a visual bounce effect, and resets sensory memory.
 func (i *Individual) handleConversion(ctx *actor.ReceiveContext, msg *pb.Convert) {
 	if msg.TargetColor == i.State.Color {
 		return // Already this color
@@ -263,6 +279,7 @@ func (i *Individual) handleConversion(ctx *actor.ReceiveContext, msg *pb.Convert
 	i.visibleFriends = nil
 }
 
+// reportState sends the actor's current state back to the sender (World).
 func (i *Individual) reportState(ctx *actor.ReceiveContext) {
 	state := i.makeState()
 	// Reply to sender (should be World)
@@ -271,10 +288,12 @@ func (i *Individual) reportState(ctx *actor.ReceiveContext) {
 	}
 }
 
+// respondState sends the actor's current state as a response.
 func (i *Individual) respondState(ctx *actor.ReceiveContext) {
 	ctx.Response(i.makeState())
 }
 
+// makeState creates a protobuf ActorState message from the entity.
 func (i *Individual) makeState() *pb.ActorState {
 	return i.State.ToProto()
 }
@@ -283,6 +302,7 @@ func (i *Individual) makeState() *pb.ActorState {
 // Physics / Movement
 // ============================================================================
 
+// chaseClosestTarget finds the nearest visible target and steers towards it.
 func (i *Individual) chaseClosestTarget() {
 	if len(i.visibleTargets) == 0 {
 		return
@@ -326,6 +346,7 @@ func (i *Individual) chaseClosestTarget() {
 // Utilities
 // ============================================================================
 
+// Log writes a debug log message with the actor ID prefix.
 func (i *Individual) Log(sys actor.ActorSystem, format string, args ...interface{}) {
 	sys.Logger().Debugf("[%s] "+format, append([]interface{}{i.ID}, args...)...)
 }

@@ -1,3 +1,6 @@
+// Package main implements the entry point for the swarm simulation game.
+// It handles command-line flags, configuration loading, logger setup,
+// and starts the Ebiten game loop with the actor system.
 package main
 
 import (
@@ -20,6 +23,7 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
+// Command-line flags for CPU and memory profiling.
 var (
 	cpuprofile = flag.String("cpuprofile", "", "write cpu profile to file")
 	memprofile = flag.String("memprofile", "", "write memory profile to file")
@@ -38,14 +42,19 @@ func (z *ZapAdapter) LogLevel() log.Level {
 	return log.InfoLevel // Placeholder, as zap handles its own filtering
 }
 
+// LogOutput returns the writers this logger outputs to.
 func (z *ZapAdapter) LogOutput() []io.Writer {
 	return []io.Writer{os.Stdout}
 }
 
+// StdLogger returns a standard library logger for compatibility.
 func (z *ZapAdapter) StdLogger() *stdLog.Logger {
 	return stdLog.New(os.Stdout, "", stdLog.LstdFlags)
 }
 
+// main is the entry point for the simulation.
+// It loads configuration, initializes logging, starts the actor system,
+// and runs the Ebiten game loop.
 func main() {
 	flag.Parse()
 

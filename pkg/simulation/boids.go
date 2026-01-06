@@ -5,8 +5,23 @@ import (
 	"github.com/lao-tseu-is-alive/go-swarm-simulation/pkg/geometry"
 )
 
-// ComputeBoidUpdate calculates the new velocity based on boids rules.
-// Config values are passed as parameters to avoid shared state.
+// ComputeBoidUpdate calculates the steering force for a Blue actor based on boids rules.
+//
+// The classic boids algorithm implements three behaviors:
+//   - Separation: steer away from nearby neighbors (within personalSpace)
+//   - Cohesion: steer towards the average position of neighbors (within flockVision)
+//   - Alignment: steer to match the average velocity of neighbors (within flockVision)
+//
+// Parameters:
+//   - me: the entity to compute forces for
+//   - friends: slice of visible friendly actors
+//   - flockVision: radius for cohesion and alignment calculations
+//   - personalSpace: radius for separation calculations
+//   - cohesion: strength multiplier for cohesion force
+//   - separation: strength multiplier for separation force
+//   - alignment: strength multiplier for alignment force
+//
+// Returns a velocity delta (force) to be added to the entity's current velocity.
 func ComputeBoidUpdate(
 	me *Entity,
 	friends []*pb.ActorState,

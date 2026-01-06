@@ -24,8 +24,10 @@ var (
 	trailSprite   *ebiten.Image
 )
 
-const drawTrails = false
+const drawTrails = false // Set to true to enable actor movement trails
 
+// Game implements the ebiten.Game interface and manages the simulation lifecycle.
+// It coordinates between the UI, actor system, and rendering.
 type Game struct {
 	ctx        context.Context
 	System     actor.ActorSystem
@@ -72,6 +74,9 @@ type Game struct {
 	drawAvg            float64 // Rolling average in ms
 }
 
+// GetNewGame creates and initializes a new Game instance.
+// It spawns the WorldActor, sets up the UI panel with all configuration widgets,
+// and wires up callbacks for buttons and sliders.
 func GetNewGame(ctx context.Context, cfg *Config, system actor.ActorSystem) *Game {
 	// 1. Create Channels for communication
 	snapshotCh := make(chan *pb.WorldSnapshot, 10) // Buffer to avoid blocking

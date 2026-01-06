@@ -12,11 +12,14 @@ import (
 	"github.com/tochemey/goakt/v3/goaktpb"
 )
 
+// gridKey is a spatial hash key for the grid-based neighbor lookup optimization.
 type gridKey struct {
 	x, y int
 }
 
-// WorldActor is the new "Brain." It manages the authoritative state and the spatial grid optimization.
+// WorldActor is the central coordinator of the simulation.
+// It manages all entities, handles spatial hashing for efficient neighbor lookups,
+// processes physics, and routes messages between actors.
 type WorldActor struct {
 	entities  map[string]*Entity
 	pids      []*actor.PID // Keep track of children
@@ -32,7 +35,7 @@ type WorldActor struct {
 	visualRange     float64 // For friends (Blue seeking Blue)
 	defenseRadius   float64
 	cfg             *Config
-	// --- Benchmark Stats ---
+	// Benchmark Stats
 	msgSentCount int
 	msgRecvCount int
 	lastLogTime  time.Time
@@ -55,16 +58,19 @@ func NewWorldActor(snapshotCh chan<- *pb.WorldSnapshot, cfg *Config) *WorldActor
 	}
 }
 
+// PreStart is called when the WorldActor starts.
+// It logs initialization but spawning happens in PostStart via the Receive handler.
 func (w *WorldActor) PreStart(ctx *actor.Context) error {
-	// 1. WE SPAWN THE POPULATION HERE NOW
-	// The World is responsible for creating its inhabitants
-	// Actually, Individuals need a way to talk back.
-	// In this refactor, Individuals should send to ctx.Parent() (the World).
 	ctx.ActorSystem().Logger().Info("World is spawning the swarm...")
-
 	return nil
 }
 
+// Receive handles messages sent to the WorldActor.
+// Supported messages:
+//   - PostStart: spawns the initial population
+//   - ActorState: updates entity state from Individual actors
+//   - Tick: runs one simulation step
+//   - UpdateConfig: updates configuration and broadcasts to all actors
 func (w *WorldActor) Receive(ctx *actor.ReceiveContext) {
 	switch msg := ctx.Message().(type) {
 
@@ -131,6 +137,7 @@ func (w *WorldActor) Receive(ctx *actor.ReceiveContext) {
 	}
 }
 
+// logBenchmarks logs message throughput statistics once per second.
 func (w *WorldActor) logBenchmarks(ctx *actor.ReceiveContext) {
 	if time.Since(w.lastLogTime) >= time.Second {
 		total := w.msgSentCount + w.msgRecvCount
@@ -142,6 +149,8 @@ func (w *WorldActor) logBenchmarks(ctx *actor.ReceiveContext) {
 	}
 }
 
+// pushSnapshot sends the current world state to the UI channel.
+// Non-blocking: if the channel is full, this frame is skipped.
 func (w *WorldActor) pushSnapshot() {
 	select {
 	case w.snapshotCh <- w.buildSnapshot():

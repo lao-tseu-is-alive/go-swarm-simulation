@@ -5,9 +5,12 @@ import (
 	"github.com/lao-tseu-is-alive/go-swarm-simulation/pkg/geometry"
 )
 
+// Entity represents a simulation actor's physical state.
+// It stores position, velocity, team color, and handles physics calculations.
+// Entity is the domain model that sits between the actor logic and protobuf messages.
 type Entity struct {
-	ID    string
-	Color pb.TeamColor
+	ID    string       // Unique identifier for this entity
+	Color pb.TeamColor // Team affiliation (TEAM_RED or TEAM_BLUE)
 	Pos   geometry.Vector2D
 	Vel   geometry.Vector2D
 
@@ -51,6 +54,9 @@ func (e *Entity) UpdateFromProto(p *pb.ActorState) {
 	e.Color = p.Color
 }
 
+// ClampVelocity ensures the entity's speed stays within [minSpeed, maxSpeed].
+// If speed exceeds maxSpeed, velocity is scaled down.
+// If speed is below minSpeed (and non-zero), velocity is scaled up.
 func (e *Entity) ClampVelocity(minSpeed, maxSpeed float64) {
 	speed := e.Vel.Len()
 	if speed > maxSpeed {
@@ -60,6 +66,8 @@ func (e *Entity) ClampVelocity(minSpeed, maxSpeed float64) {
 	}
 }
 
+// BounceOffWalls reverses velocity when hitting world boundaries.
+// Used by Red actors for hard collisions with walls.
 func (e *Entity) BounceOffWalls(width, height float64) {
 	if e.Pos.X < 0 {
 		e.Pos.X = 0
@@ -81,6 +89,8 @@ func (e *Entity) BounceOffWalls(width, height float64) {
 	}
 }
 
+// SoftBoundaries applies a gradual steering force near world edges.
+// Used by Blue actors for smooth boids-style edge avoidance.
 func (e *Entity) SoftBoundaries(width, height, turnFactor float64) {
 	margin := height / 20
 	if e.Pos.X < margin {
@@ -95,6 +105,8 @@ func (e *Entity) SoftBoundaries(width, height, turnFactor float64) {
 	}
 }
 
+// Seek steers the entity towards a target position.
+// The entity accelerates towards the target at the given strength, capped by maxSpeed.
 func (e *Entity) Seek(target geometry.Vector2D, strength, maxSpeed float64) {
 	// 1. Desired velocity = vector to target
 	desired := target.Sub(e.Pos)

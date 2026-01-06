@@ -1,3 +1,6 @@
+// Package simulation provides the core simulation logic for the swarm simulation game.
+// It implements a predator-prey (Red vs Blue) simulation using an actor-based architecture
+// with boids flocking behavior for Blue actors.
 package simulation
 
 import (
@@ -8,6 +11,9 @@ import (
 	"github.com/santhosh-tekuri/jsonschema/v5"
 )
 
+// Config holds all configuration parameters for the simulation.
+// It is organized into sections matching the UI panel layout.
+// Config values are loaded from JSON and validated against a schema.
 type Config struct {
 	// =========================================================================
 	// WORLD DIMENSIONS
@@ -111,6 +117,8 @@ type Config struct {
 	DisplayDefenseCircle bool `json:"displayDefenseCircle"`
 }
 
+// DefaultConfig returns a Config with sensible default values.
+// These defaults are used when no config file is found or as a baseline.
 func DefaultConfig() *Config {
 	return &Config{
 		WorldWidth:             1000,
@@ -136,6 +144,8 @@ func DefaultConfig() *Config {
 	}
 }
 
+// Validate checks that config values are logically consistent.
+// It returns an error if any validation rule is violated.
 func (c *Config) Validate() error {
 	if c.BlueDefenseRange > c.RedDetectionRange {
 		return fmt.Errorf("blueDefenseRange (%f) cannot exceed redDetectionRange (%f)",
