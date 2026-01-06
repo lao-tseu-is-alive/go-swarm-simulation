@@ -113,6 +113,7 @@ func (i *Individual) updateAsRed() {
 		i.State.Vel = i.State.Vel.Add(jitter)
 	}
 	i.State.UpdatePhysics() // Pos += Vel
+	i.State.ClampVelocity(i.cfg.MinSpeed, i.cfg.MaxSpeed)
 	i.State.BounceOffWalls(i.cfg.WorldWidth, i.cfg.WorldHeight)
 }
 
@@ -151,8 +152,6 @@ func (i *Individual) BlueBehavior(ctx *actor.ReceiveContext) {
 func (i *Individual) updateAsBlue() {
 	// Apply boids flocking rules
 	force := ComputeBoidUpdate(i.State, i.visibleFriends, i.cfg)
-	//i.updateSoftTurnPosition()
-
 	i.State.Vel = i.State.Vel.Add(force) // Apply force
 	i.State.SoftBoundaries(i.cfg.WorldWidth, i.cfg.WorldHeight, i.cfg.TurnFactor)
 	i.State.ClampVelocity(i.cfg.MinSpeed, i.cfg.MaxSpeed)
@@ -182,7 +181,7 @@ func (i *Individual) handleConversion(ctx *actor.ReceiveContext, msg *pb.Convert
 	}
 
 	// Visual feedback: "Explosion" Bounce effect
-	i.State.Vel.Mul(-1.5)
+	i.State.Vel = i.State.Vel.Mul(-1.5)
 
 	// Reset sensory memory
 	i.visibleTargets = nil
@@ -238,7 +237,7 @@ func (i *Individual) chaseClosestTarget() {
 	length := i.State.Pos.DistanceTo(GeomVector2DFromProto(closest.Position))
 
 	if length > 0 {
-		pursuit.Normalize().Mul(i.cfg.Aggression)
+		pursuit = pursuit.Normalize().Mul(i.cfg.Aggression)
 		i.State.Vel = i.State.Vel.Add(pursuit)
 	}
 
