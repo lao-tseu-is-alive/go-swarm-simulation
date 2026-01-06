@@ -160,39 +160,31 @@ func LoadConfig(configFile string, schemaFile string) (*Config, error) {
 		return nil, fmt.Errorf("failed to compile schema: %w", err)
 	}
 
-	// 2. Read Config File
-	f, err := os.Open(configFile)
+	// 2. Read Config File Bytes
+	b, err := os.ReadFile(configFile)
 	if err != nil {
-		return nil, fmt.Errorf("failed to open config file: %w", err)
+		return nil, fmt.Errorf("failed to read config file: %w", err)
 	}
-	defer f.Close()
 
-	// 3. Validate
+	// 3. Unmarshal to interface{} for JSON Schema Validation
 	var v interface{}
-	if err := json.NewDecoder(f).Decode(&v); err != nil {
-		return nil, fmt.Errorf("failed to decode config json: %w", err)
+	if err := json.Unmarshal(b, &v); err != nil {
+		return nil, fmt.Errorf("failed to decode config json for validation: %w", err)
 	}
 
 	if err := sch.Validate(v); err != nil {
-		return nil, fmt.Errorf("config validation failed: %w", err)
+		return nil, fmt.Errorf("config schema validation failed: %w", err)
 	}
 
-	// 4. Unmarshal into Struct
-	// We need to re-read or marshal the map back to bytes, or just decode again.
-	// Since we already decoded into interface{}, let's just re-open or seek.
-	// Simpler: Just read bytes first.
-	b, err := os.ReadFile(configFile)
-	if err != nil {
-		return nil, err
-	}
-
+	// 4. Unmarshal to Config Struct
+	// Since we already have the bytes in memory, this is fast.
 	var cfg Config
 	if err := json.Unmarshal(b, &cfg); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
+		return nil, fmt.Errorf("failed to unmarshal config to struct: %w", err)
 	}
 
-	err = cfg.Validate()
-	if err != nil {
+	// 5. Logical Validation (struct-level checks)
+	if err := cfg.Validate(); err != nil {
 		return nil, err
 	}
 
