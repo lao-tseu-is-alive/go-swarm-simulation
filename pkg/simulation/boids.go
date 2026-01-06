@@ -25,14 +25,14 @@ func ComputeBoidUpdate(me *Entity, friends []*pb.ActorState, cfg *Config) geomet
 		}
 		distSq := me.Pos.DistanceSquaredTo(other.Pos)
 		// 1. Separation
-		if distSq < cfg.ProtectedRange*cfg.ProtectedRange {
+		if distSq < cfg.BluePersonalSpace*cfg.BluePersonalSpace {
 			// Push away: (me - other)
 			diff := me.Pos.Sub(other.Pos)
 			separation = separation.Add(diff)
 		}
 
 		// Check visual range for Cohesion/Alignment
-		if distSq < cfg.VisualRange*cfg.VisualRange {
+		if distSq < cfg.BlueFlockVision*cfg.BlueFlockVision {
 			avgVel = avgVel.Add(other.Vel)
 			avgPos = avgPos.Add(other.Pos)
 			neighbors++
@@ -40,18 +40,18 @@ func ComputeBoidUpdate(me *Entity, friends []*pb.ActorState, cfg *Config) geomet
 	}
 
 	// Apply Separation weights
-	force = force.Add(separation.Mul(cfg.AvoidFactor))
+	force = force.Add(separation.Mul(cfg.BlueSeparation))
 
 	// Apply Alignment and Cohesion
 	if neighbors > 0 {
 		avgVel, _ = avgVel.Div(neighbors) // Error handling ignored for brevity (neighbors > 0)
 		// Alignment: (AvgVel - MyVel) * Factor
-		align := avgVel.Sub(me.Vel).Mul(cfg.MatchingFactor)
+		align := avgVel.Sub(me.Vel).Mul(cfg.BlueAlignment)
 		force = force.Add(align)
 
 		avgPos, _ = avgPos.Div(neighbors)
 		// Cohesion: (AvgPos - MyPos) * Factor
-		cohesion := avgPos.Sub(me.Pos).Mul(cfg.CenteringFactor)
+		cohesion := avgPos.Sub(me.Pos).Mul(cfg.BlueCohesion)
 		force = force.Add(cohesion)
 	}
 

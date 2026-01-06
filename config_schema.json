@@ -15,27 +15,63 @@
     "numRedAtStart": {
       "type": "integer",
       "minimum": 0,
-      "description": "Initial number of Red (Aggressive) actors."
+      "description": "Initial number of Red (Hunter) actors."
     },
     "numBlueAtStart": {
       "type": "integer",
       "minimum": 0,
-      "description": "Initial number of Blue (Flocking) actors."
+      "description": "Initial number of Blue (Flock) actors."
     },
-    "detectionRadius": {
+    "redDetectionRange": {
       "type": "number",
       "minimum": 0,
-      "description": "Radius within which Red actors can detect Blue actors."
+      "description": "Radius within which Red actors can detect Blue actors. UI: Detection Range"
     },
-    "defenseRadius": {
+    "redAttackRange": {
       "type": "number",
       "minimum": 0,
-      "description": "Radius within which Blue actors can defend each other."
+      "description": "Distance at which Red triggers combat with Blue. UI: Attack Range"
     },
-    "contactRadius": {
+    "redAggression": {
       "type": "number",
       "minimum": 0,
-      "description": "Radius for close-range interactions (e.g., combat/conversion)."
+      "maximum": 5,
+      "description": "Multiplier for how strongly Red chases detected Blue. UI: Aggression"
+    },
+    "blueFlockVision": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Radius within which Blue actors see friends for flocking. UI: Flock Vision"
+    },
+    "bluePersonalSpace": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Minimum distance Blue tries to keep from other Blue. UI: Personal Space"
+    },
+    "blueDefenseRange": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Range to count nearby Blue defenders during combat. UI: Defense Range"
+    },
+    "blueCohesion": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Strength of Cohesion (moving towards neighbor center). UI: Cohesion"
+    },
+    "blueSeparation": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Strength of Separation (avoiding crowding neighbors). UI: Separation"
+    },
+    "blueAlignment": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Strength of Alignment (matching neighbor velocities). UI: Alignment"
+    },
+    "blueEdgeAvoidance": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Strength of turning away from screen edges. UI: Edge Avoidance"
     },
     "maxSpeed": {
       "type": "number",
@@ -43,55 +79,27 @@
       "maximum": 10,
       "description": "Maximum speed an actor can travel per tick."
     },
-    "aggression": {
-      "type": "number",
-      "minimum": 0,
-      "maximum": 5,
-      "description": "Multiplier for the Red actors' chase force."
-    },
-    "visualRange": {
-      "type": "number",
-      "minimum": 0,
-      "description": "Radius within which Blue actors can see friends for Cohesion/Alignment."
-    },
-    "protectedRange": {
-      "type": "number",
-      "minimum": 0,
-      "description": "Radius within which Blue actors try to avoid each other (Separation)."
-    },
-    "centeringFactor": {
-      "type": "number",
-      "minimum": 0,
-      "description": "Strength of Cohesion (moving towards the center of neighbors)."
-    },
-    "avoidFactor": {
-      "type": "number",
-      "minimum": 0,
-      "description": "Strength of Separation (avoiding crowding)."
-    },
-    "matchingFactor": {
-      "type": "number",
-      "minimum": 0,
-      "description": "Strength of Alignment (matching velocity with neighbors)."
-    },
-    "turnFactor": {
-      "type": "number",
-      "minimum": 0,
-      "description": "Strength of turning away from screen edges."
-    },
     "minSpeed": {
       "type": "number",
       "minimum": 0,
-      "description": "Minimum speed a Blue actor tries to maintain."
+      "description": "Minimum speed Blue actors try to maintain."
     },
     "logLevel": {
       "type": "string",
-      "enum": ["debug", "info", "warn", "error"],
+      "enum": [
+        "debug",
+        "info",
+        "warn",
+        "error"
+      ],
       "description": "Logging level."
     },
     "logFormat": {
       "type": "string",
-      "enum": ["json", "text"],
+      "enum": [
+        "json",
+        "text"
+      ],
       "description": "Logging format."
     },
     "displayDetectionCircle": {
@@ -108,17 +116,17 @@
     "worldHeight",
     "numRedAtStart",
     "numBlueAtStart",
-    "detectionRadius",
-    "defenseRadius",
-    "contactRadius",
+    "redDetectionRange",
+    "redAttackRange",
+    "redAggression",
+    "blueFlockVision",
+    "bluePersonalSpace",
+    "blueDefenseRange",
+    "blueCohesion",
+    "blueSeparation",
+    "blueAlignment",
+    "blueEdgeAvoidance",
     "maxSpeed",
-    "aggression",
-    "visualRange",
-    "protectedRange",
-    "centeringFactor",
-    "avoidFactor",
-    "matchingFactor",
-    "turnFactor",
     "minSpeed",
     "logLevel",
     "logFormat",

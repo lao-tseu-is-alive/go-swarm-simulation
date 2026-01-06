@@ -153,7 +153,7 @@ func (i *Individual) updateAsBlue() {
 	// Apply boids flocking rules
 	force := ComputeBoidUpdate(i.State, i.visibleFriends, i.cfg)
 	i.State.Vel = i.State.Vel.Add(force) // Apply force
-	i.State.SoftBoundaries(i.cfg.WorldWidth, i.cfg.WorldHeight, i.cfg.TurnFactor)
+	i.State.SoftBoundaries(i.cfg.WorldWidth, i.cfg.WorldHeight, i.cfg.BlueEdgeAvoidance)
 	i.State.ClampVelocity(i.cfg.MinSpeed, i.cfg.MaxSpeed)
 	i.State.UpdatePhysics()
 }
@@ -237,7 +237,7 @@ func (i *Individual) chaseClosestTarget() {
 	length := i.State.Pos.DistanceTo(GeomVector2DFromProto(closest.Position))
 
 	if length > 0 {
-		pursuit = pursuit.Normalize().Mul(i.cfg.Aggression)
+		pursuit = pursuit.Normalize().Mul(i.cfg.RedAggression)
 		i.State.Vel = i.State.Vel.Add(pursuit)
 	}
 

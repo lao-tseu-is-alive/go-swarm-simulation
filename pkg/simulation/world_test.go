@@ -11,10 +11,10 @@ func TestWorldActor_rebuildGrid(t *testing.T) {
 	// We need a WorldActor with specific dimensions and radii to determine cell size = max(detection, defense, 10)
 	// Let's use detection=100, defense=50 -> cell size = 100
 	cfg := &Config{
-		WorldWidth:      1000,
-		WorldHeight:     1000,
-		DetectionRadius: 100,
-		DefenseRadius:   50,
+		WorldWidth:        1000,
+		WorldHeight:       1000,
+		RedDetectionRange: 100,
+		BlueDefenseRange:  50,
 	}
 	w := NewWorldActor(nil, cfg)
 
@@ -76,10 +76,10 @@ func TestWorldActor_rebuildGrid(t *testing.T) {
 func TestWorldActor_getNearbyActors(t *testing.T) {
 	// Setup: Cell size = 100
 	cfg := &Config{
-		WorldWidth:      1000,
-		WorldHeight:     1000,
-		DetectionRadius: 100,
-		DefenseRadius:   50,
+		WorldWidth:        1000,
+		WorldHeight:       1000,
+		RedDetectionRange: 100,
+		BlueDefenseRange:  50,
 	}
 	w := NewWorldActor(nil, cfg)
 
@@ -133,10 +133,10 @@ func TestWorldActor_getNearbyActors(t *testing.T) {
 func BenchmarkWorldActor_rebuildGrid(b *testing.B) {
 	// Setup: 1000 entities
 	cfg := &Config{
-		WorldWidth:      1000,
-		WorldHeight:     1000,
-		DetectionRadius: 100,
-		DefenseRadius:   50,
+		WorldWidth:        1000,
+		WorldHeight:       1000,
+		RedDetectionRange: 100,
+		BlueDefenseRange:  50,
 	}
 	w := NewWorldActor(nil, cfg)
 	for i := 0; i < 1000; i++ {
@@ -153,10 +153,10 @@ func BenchmarkWorldActor_rebuildGrid(b *testing.B) {
 func BenchmarkWorldActor_getNearbyActors(b *testing.B) {
 	// Setup: Populated grid
 	cfg := &Config{
-		WorldWidth:      1000,
-		WorldHeight:     1000,
-		DetectionRadius: 100,
-		DefenseRadius:   50,
+		WorldWidth:        1000,
+		WorldHeight:       1000,
+		RedDetectionRange: 100,
+		BlueDefenseRange:  50,
 	}
 	w := NewWorldActor(nil, cfg)
 	// Fill grid with some entities

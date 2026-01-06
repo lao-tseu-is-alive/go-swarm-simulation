@@ -46,9 +46,9 @@ func NewWorldActor(snapshotCh chan<- *pb.WorldSnapshot, cfg *Config) *WorldActor
 		grid:            make(map[gridKey][]*Entity),
 		snapshotCh:      snapshotCh,
 		cfg:             cfg,
-		detectionRadius: cfg.DetectionRadius,
-		defenseRadius:   cfg.DefenseRadius,
-		visualRange:     cfg.VisualRange,
+		detectionRadius: cfg.RedDetectionRange,
+		defenseRadius:   cfg.BlueDefenseRange,
+		visualRange:     cfg.BlueFlockVision,
 		msgSentCount:    0,
 		msgRecvCount:    0,
 		lastLogTime:     time.Now(),
@@ -103,18 +103,18 @@ func (w *WorldActor) Receive(ctx *actor.ReceiveContext) {
 		w.visualRange = msg.GetVisualRange()
 
 		// Update config for other parameters (these affect new calculations)
-		w.cfg.DetectionRadius = msg.GetDetectionRadius()
-		w.cfg.DefenseRadius = msg.GetDefenseRadius()
-		w.cfg.ContactRadius = msg.GetContactRadius()
-		w.cfg.VisualRange = msg.GetVisualRange()
-		w.cfg.ProtectedRange = msg.GetProtectedRange()
+		w.cfg.RedDetectionRange = msg.GetDetectionRadius()
+		w.cfg.BlueDefenseRange = msg.GetDefenseRadius()
+		w.cfg.RedAttackRange = msg.GetContactRadius()
+		w.cfg.BlueFlockVision = msg.GetVisualRange()
+		w.cfg.BluePersonalSpace = msg.GetProtectedRange()
 		w.cfg.MaxSpeed = msg.GetMaxSpeed()
 		w.cfg.MinSpeed = msg.GetMinSpeed()
-		w.cfg.Aggression = msg.GetAggression()
-		w.cfg.CenteringFactor = msg.GetCenteringFactor()
-		w.cfg.AvoidFactor = msg.GetAvoidFactor()
-		w.cfg.MatchingFactor = msg.GetMatchingFactor()
-		w.cfg.TurnFactor = msg.GetTurnFactor()
+		w.cfg.RedAggression = msg.GetAggression()
+		w.cfg.BlueCohesion = msg.GetCenteringFactor()
+		w.cfg.BlueSeparation = msg.GetAvoidFactor()
+		w.cfg.BlueAlignment = msg.GetMatchingFactor()
+		w.cfg.BlueEdgeAvoidance = msg.GetTurnFactor()
 		w.cfg.DisplayDetectionCircle = msg.GetDisplayDetectionCircle()
 		w.cfg.DisplayDefenseCircle = msg.GetDisplayDefenseCircle()
 
@@ -155,7 +155,7 @@ func (w *WorldActor) broadcastSimulationStep(ctx *actor.ReceiveContext, dt int64
 	}{
 		perceptionSq: w.visualRange * w.visualRange,
 		detectionSq:  w.detectionRadius * w.detectionRadius,
-		contactSq:    w.cfg.ContactRadius * w.cfg.ContactRadius,
+		contactSq:    w.cfg.RedAttackRange * w.cfg.RedAttackRange,
 	}
 
 	for id, me := range w.entities {
@@ -260,12 +260,12 @@ func (w *WorldActor) spawnSwarm(ctx *actor.ReceiveContext) {
 	var (
 		redX     = w.cfg.WorldWidth / 6
 		redY     = w.cfg.WorldHeight / 6
-		incRedX  = math.Min(w.cfg.WorldHeight/float64(w.cfg.NumRedAtStart), w.cfg.DetectionRadius)
-		incRedY  = math.Min(w.cfg.WorldHeight/float64(w.cfg.NumRedAtStart), w.cfg.DetectionRadius)
+		incRedX  = math.Min(w.cfg.WorldHeight/float64(w.cfg.NumRedAtStart), w.cfg.RedDetectionRange)
+		incRedY  = math.Min(w.cfg.WorldHeight/float64(w.cfg.NumRedAtStart), w.cfg.RedDetectionRange)
 		blueX    = (w.cfg.WorldWidth / 4) * 2
 		blueY    = (w.cfg.WorldHeight / 4) * 2
-		incBlueX = math.Min(w.cfg.WorldHeight/float64(w.cfg.NumBlueAtStart), w.cfg.DefenseRadius)
-		incBlueY = math.Min(w.cfg.WorldHeight/float64(w.cfg.NumBlueAtStart), w.cfg.DefenseRadius)
+		incBlueX = math.Min(w.cfg.WorldHeight/float64(w.cfg.NumBlueAtStart), w.cfg.BlueDefenseRange)
+		incBlueY = math.Min(w.cfg.WorldHeight/float64(w.cfg.NumBlueAtStart), w.cfg.BlueDefenseRange)
 	)
 	// 1. SPAWN REDS
 	for i := 0; i < w.cfg.NumRedAtStart; i++ {
@@ -428,7 +428,7 @@ func (w *WorldActor) sendPerceptionUpdates(ctx *actor.ReceiveContext) {
 
 // processInteractions  Only handle combat now
 func (w *WorldActor) processInteractions(ctx *actor.ReceiveContext) {
-	contactSq := w.cfg.ContactRadius * w.cfg.ContactRadius
+	contactSq := w.cfg.RedAttackRange * w.cfg.RedAttackRange
 
 	// Only iterate Red entities to avoid double-processing
 	for _, attacker := range w.entities {

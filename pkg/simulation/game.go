@@ -88,26 +88,37 @@ func GetNewGame(ctx context.Context, cfg *Config, system actor.ActorSystem) *Gam
 	// 3. Initialize UI Panel with all configuration widgets
 	panel := ui.NewUIPanel(10, 10, 280, float64(cfg.WorldHeight)-20)
 
-	// Add sections and widgets
-	panel.AddSection("Interaction Radii")
-	widgetDetectionRadius := panel.AddSlider("Detection Radius", 10, 300, cfg.DetectionRadius)
-	widgetDefenseRadius := panel.AddSlider("Defense Radius", 10, 300, cfg.DefenseRadius)
-	widgetContactRadius := panel.AddSlider("Contact Radius", 5, 50, cfg.ContactRadius)
-	widgetVisualRange := panel.AddSlider("Visual Range", 10, 150, cfg.VisualRange)
-	widgetProtectedRange := panel.AddSlider("Protected Range", 5, 50, cfg.ProtectedRange)
+	// Add sections and widgets - organized by which color they affect
+	// Define indicator colors
+	redIndicator := color.RGBA{R: 255, G: 60, B: 60, A: 255}
+	blueIndicator := color.RGBA{R: 60, G: 120, B: 255, A: 255}
+
+	// RED ACTOR SETTINGS - Hunter behavior
+	panel.AddColoredSection("Red Hunter", redIndicator)
+	widgetDetectionRadius := panel.AddSlider("Detection Range", 10, 300, cfg.RedDetectionRange)
+	widgetContactRadius := panel.AddSlider("Attack Range", 5, 50, cfg.RedAttackRange)
+	widgetAggression := panel.AddSlider("Aggression", 0.1, 2.0, cfg.RedAggression)
 	panel.EndSection()
 
-	panel.AddSection("Physics & Behavior")
+	// BLUE ACTOR SETTINGS - Flocking prey
+	panel.AddColoredSection("Blue Flock", blueIndicator)
+	widgetVisualRange := panel.AddSlider("Flock Vision", 10, 150, cfg.BlueFlockVision)
+	widgetProtectedRange := panel.AddSlider("Personal Space", 5, 50, cfg.BluePersonalSpace)
+	widgetDefenseRadius := panel.AddSlider("Defense Range", 10, 300, cfg.BlueDefenseRange)
+	panel.EndSection()
+
+	// BOIDS FLOCKING FACTORS - Fine-tuning for blue behavior
+	panel.AddColoredSection("Flocking Tuning", blueIndicator)
+	widgetCenteringFactor := panel.AddSlider("Cohesion", 0.0001, 0.01, cfg.BlueCohesion)
+	widgetAvoidFactor := panel.AddSlider("Separation", 0.001, 0.2, cfg.BlueSeparation)
+	widgetMatchingFactor := panel.AddSlider("Alignment", 0.001, 0.2, cfg.BlueAlignment)
+	widgetTurnFactor := panel.AddSlider("Edge Avoidance", 0.05, 1.0, cfg.BlueEdgeAvoidance)
+	panel.EndSection()
+
+	// SHARED PHYSICS - Applies to both colors
+	panel.AddSection("Physics (Both)")
 	widgetMaxSpeed := panel.AddSlider("Max Speed", 1, 10, cfg.MaxSpeed)
 	widgetMinSpeed := panel.AddSlider("Min Speed", 0.5, 8, cfg.MinSpeed)
-	widgetAggression := panel.AddSlider("Aggression", 0.1, 2.0, cfg.Aggression)
-	panel.EndSection()
-
-	panel.AddSection("Boids Flocking")
-	widgetCenteringFactor := panel.AddSlider("Centering Factor", 0.0001, 0.01, cfg.CenteringFactor)
-	widgetAvoidFactor := panel.AddSlider("Avoid Factor", 0.001, 0.2, cfg.AvoidFactor)
-	widgetMatchingFactor := panel.AddSlider("Matching Factor", 0.001, 0.2, cfg.MatchingFactor)
-	widgetTurnFactor := panel.AddSlider("Turn Factor", 0.05, 1.0, cfg.TurnFactor)
 	panel.EndSection()
 
 	panel.AddSection("Population (Restart Required)")
@@ -126,7 +137,7 @@ func GetNewGame(ctx context.Context, cfg *Config, system actor.ActorSystem) *Gam
 	panel.EndSection()
 
 	// Create toggle button (positioned at top-left when panel is hidden)
-	toggleButton := ui.NewButton(10, 10, 120, 35, "⚙ Settings", nil)
+	toggleButton := ui.NewButton(10, 10, 120, 35, "< Settings", nil)
 
 	game := &Game{
 		ctx:                    ctx,
@@ -617,18 +628,18 @@ func (g *Game) restartSimulation() {
 	g.trails = make(map[string][]geometry.Vector2D)
 
 	// Update config with current widget values
-	g.cfg.DetectionRadius = g.widgetDetectionRadius.Value
-	g.cfg.DefenseRadius = g.widgetDefenseRadius.Value
-	g.cfg.ContactRadius = g.widgetContactRadius.Value
-	g.cfg.VisualRange = g.widgetVisualRange.Value
-	g.cfg.ProtectedRange = g.widgetProtectedRange.Value
+	g.cfg.RedDetectionRange = g.widgetDetectionRadius.Value
+	g.cfg.BlueDefenseRange = g.widgetDefenseRadius.Value
+	g.cfg.RedAttackRange = g.widgetContactRadius.Value
+	g.cfg.BlueFlockVision = g.widgetVisualRange.Value
+	g.cfg.BluePersonalSpace = g.widgetProtectedRange.Value
 	g.cfg.MaxSpeed = g.widgetMaxSpeed.Value
 	g.cfg.MinSpeed = g.widgetMinSpeed.Value
-	g.cfg.Aggression = g.widgetAggression.Value
-	g.cfg.CenteringFactor = g.widgetCenteringFactor.Value
-	g.cfg.AvoidFactor = g.widgetAvoidFactor.Value
-	g.cfg.MatchingFactor = g.widgetMatchingFactor.Value
-	g.cfg.TurnFactor = g.widgetTurnFactor.Value
+	g.cfg.RedAggression = g.widgetAggression.Value
+	g.cfg.BlueCohesion = g.widgetCenteringFactor.Value
+	g.cfg.BlueSeparation = g.widgetAvoidFactor.Value
+	g.cfg.BlueAlignment = g.widgetMatchingFactor.Value
+	g.cfg.BlueEdgeAvoidance = g.widgetTurnFactor.Value
 	g.cfg.NumRedAtStart = int(g.widgetNumRed.Value)
 	g.cfg.NumBlueAtStart = int(g.widgetNumBlue.Value)
 	g.cfg.DisplayDetectionCircle = g.widgetDisplayDetection.Value

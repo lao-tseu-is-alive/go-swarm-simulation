@@ -61,8 +61,6 @@ func (e *Entity) ClampVelocity(minSpeed, maxSpeed float64) {
 }
 
 func (e *Entity) BounceOffWalls(width, height float64) {
-	// Simple integration is usually done before bounce,
-	// but assuming UpdatePhysics() called separately:
 	if e.Pos.X < 0 {
 		e.Pos.X = 0
 		e.Vel.X *= -1
@@ -84,7 +82,7 @@ func (e *Entity) BounceOffWalls(width, height float64) {
 }
 
 func (e *Entity) SoftBoundaries(width, height, turnFactor float64) {
-	margin := 100.0
+	margin := height / 20
 	if e.Pos.X < margin {
 		e.Vel.X += turnFactor
 	} else if e.Pos.X > width-margin {

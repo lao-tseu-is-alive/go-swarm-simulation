@@ -73,6 +73,7 @@ type PanelSection struct {
 	StartIndex int // Widget index where this section starts
 	EndIndex   int // Widget index where this section ends (exclusive)
 	Collapsed  bool
+	Indicator  *color.RGBA // Optional color indicator (nil = no indicator)
 }
 
 // NewUIPanel creates a new UI panel
@@ -108,12 +109,23 @@ func NewUIPanel(x, y, width, height float64) *UIPanel {
 	return panel
 }
 
-// AddSection adds a section header
+// AddSection adds a section header with no color indicator
 func (p *UIPanel) AddSection(title string) {
 	p.sections = append(p.sections, PanelSection{
 		Title:      title,
 		StartIndex: len(p.Widgets),
 		Collapsed:  false,
+		Indicator:  nil,
+	})
+}
+
+// AddColoredSection adds a section header with a color indicator square
+func (p *UIPanel) AddColoredSection(title string, indicator color.RGBA) {
+	p.sections = append(p.sections, PanelSection{
+		Title:      title,
+		StartIndex: len(p.Widgets),
+		Collapsed:  false,
+		Indicator:  &indicator,
 	})
 }
 
@@ -282,8 +294,25 @@ func (p *UIPanel) Draw(screen *ebiten.Image) {
 				float32(p.X+5), float32(currentY),
 				float32(p.Width-10), 20,
 				sectionBG, true)
+
+			// Draw color indicator if present
+			textX := p.X + 10
+			if section.Indicator != nil {
+				// Draw colored square indicator
+				vector.FillRect(screen,
+					float32(p.X+10), float32(currentY+5),
+					12, 12,
+					*section.Indicator, true)
+				// Draw border around indicator
+				vector.StrokeRect(screen,
+					float32(p.X+10), float32(currentY+5),
+					12, 12,
+					1, color.RGBA{R: 255, G: 255, B: 255, A: 150}, true)
+				textX = p.X + 28 // Offset text after indicator
+			}
+
 			ebitenutil.DebugPrintAt(screen, section.Title,
-				int(p.X+10), int(currentY+5))
+				int(textX), int(currentY+5))
 		}
 		currentY += 25
 
