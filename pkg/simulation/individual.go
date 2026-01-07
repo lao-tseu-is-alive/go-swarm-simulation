@@ -207,10 +207,20 @@ func (i *Individual) BlueBehavior(ctx *actor.ReceiveContext) {
 
 // updateAsBlue performs Blue actor physics: boids flocking behavior.
 func (i *Individual) updateAsBlue() {
+	// DEFENSIVE: Filter friends to match current color.
+	// This handles the race condition where World sent perception data
+	// before we processed a Convert message (identity crisis fix).
+	validFriends := i.visibleFriends[:0] // Reuse slice backing - zero allocation
+	for _, friend := range i.visibleFriends {
+		if friend.Color == i.State.Color {
+			validFriends = append(validFriends, friend)
+		}
+	}
+
 	// Apply boids flocking rules using owned config values
 	force := ComputeBoidUpdate(
 		i.State,
-		i.visibleFriends,
+		validFriends,
 		i.blueFlockVision,
 		i.bluePersonalSpace,
 		i.blueCohesion,
