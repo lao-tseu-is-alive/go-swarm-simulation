@@ -162,7 +162,15 @@ func (w *WorldActor) pushSnapshot() {
 // broadcastSimulationStep is the "Mega Loop" optimized for single-pass execution.
 // It combines Perception gathering, Combat Logic, and Tick dispatching.
 func (w *WorldActor) broadcastSimulationStep(ctx *actor.ReceiveContext, dt int64) {
-	// Pre-calculate squared ranges to avoid Sqrt() calls in loops
+	// 1. PRE-CACHE all proto representations (done once per tick)
+	// This optimization reduces allocations from O(actors × neighbors) to O(actors)
+	// by computing each entity's protobuf state once and reusing the pointer.
+	protoCache := make(map[string]*pb.ActorState, len(w.entities))
+	for id, entity := range w.entities {
+		protoCache[id] = entity.ToProto()
+	}
+
+	// 2. Pre-calculate squared ranges to avoid Sqrt() calls in loops
 	ranges := struct {
 		perceptionSq float64
 		detectionSq  float64
@@ -174,10 +182,10 @@ func (w *WorldActor) broadcastSimulationStep(ctx *actor.ReceiveContext, dt int64
 	}
 
 	for id, me := range w.entities {
-		// 1. Scan grid for neighbors (Perception + Combat triggers)
-		enemies, friends := w.scanNeighbors(ctx, me, ranges)
+		// 3. Scan grid for neighbors (Perception + Combat triggers)
+		enemies, friends := w.scanNeighbors(ctx, me, ranges, protoCache)
 
-		// 2. Construct the enriched Tick
+		// 4. Construct the enriched Tick
 		individualTick := &pb.Tick{
 			DeltaTime: dt,
 			Context: &pb.Perception{
@@ -186,7 +194,7 @@ func (w *WorldActor) broadcastSimulationStep(ctx *actor.ReceiveContext, dt int64
 			},
 		}
 
-		// 3. Dispatch
+		// 5. Dispatch
 		if pid, ok := w.pidsCache[id]; ok {
 			w.msgSentCount++
 			ctx.Tell(pid, individualTick)
@@ -196,7 +204,13 @@ func (w *WorldActor) broadcastSimulationStep(ctx *actor.ReceiveContext, dt int64
 
 // scanNeighbors iterates the spatial grid around 'me'.
 // It populates perception lists AND handles combat interactions inline for efficiency.
-func (w *WorldActor) scanNeighbors(ctx *actor.ReceiveContext, me *Entity, ranges struct{ perceptionSq, detectionSq, contactSq float64 }) ([]*pb.ActorState, []*pb.ActorState) {
+// protoCache provides pre-computed protobuf states to avoid repeated allocations.
+func (w *WorldActor) scanNeighbors(
+	ctx *actor.ReceiveContext,
+	me *Entity,
+	ranges struct{ perceptionSq, detectionSq, contactSq float64 },
+	protoCache map[string]*pb.ActorState,
+) ([]*pb.ActorState, []*pb.ActorState) {
 	var visibleEnemies []*pb.ActorState
 	var visibleFriends []*pb.ActorState
 
@@ -223,12 +237,14 @@ func (w *WorldActor) scanNeighbors(ctx *actor.ReceiveContext, me *Entity, ranges
 				if other.Color == me.Color {
 					// Friend Logic: Flocking
 					if distSq < ranges.perceptionSq {
-						visibleFriends = append(visibleFriends, other.ToProto())
+						// Use cached proto instead of allocating new one
+						visibleFriends = append(visibleFriends, protoCache[other.ID])
 					}
 				} else {
 					// Enemy Logic: Detection
 					if distSq < ranges.detectionSq {
-						visibleEnemies = append(visibleEnemies, other.ToProto())
+						// Use cached proto instead of allocating new one
+						visibleEnemies = append(visibleEnemies, protoCache[other.ID])
 					}
 				}
 
