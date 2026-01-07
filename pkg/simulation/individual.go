@@ -154,8 +154,18 @@ func (i *Individual) RedBehavior(ctx *actor.ReceiveContext) {
 
 // updateAsRed performs Red actor physics: chase targets or wander.
 func (i *Individual) updateAsRed() {
-	if len(i.visibleTargets) > 0 {
-		i.chaseClosestTarget()
+	// DEFENSIVE: Filter targets to ensure they are actually enemies (different color).
+	// This handles the race condition where World sent perception data
+	// before we processed a Convert message (symmetric to Blue fix).
+	validTargets := i.visibleTargets[:0] // Reuse slice backing - zero allocation
+	for _, target := range i.visibleTargets {
+		if target.Color != i.State.Color {
+			validTargets = append(validTargets, target)
+		}
+	}
+
+	if len(validTargets) > 0 {
+		i.chaseClosestValidTarget(validTargets)
 	} else {
 		// Wander when no targets visible
 		jitter := geometry.Vector2D{
@@ -312,9 +322,10 @@ func (i *Individual) makeState() *pb.ActorState {
 // Physics / Movement
 // ============================================================================
 
-// chaseClosestTarget finds the nearest visible target and steers towards it.
-func (i *Individual) chaseClosestTarget() {
-	if len(i.visibleTargets) == 0 {
+// chaseClosestValidTarget finds the nearest target in the provided list and steers towards it.
+// The targets slice should be pre-filtered to ensure all entries are valid enemies.
+func (i *Individual) chaseClosestValidTarget(targets []*pb.ActorState) {
+	if len(targets) == 0 {
 		return
 	}
 
@@ -322,7 +333,7 @@ func (i *Individual) chaseClosestTarget() {
 	var closest *pb.ActorState
 	minDistSq := math.MaxFloat64
 
-	for _, target := range i.visibleTargets {
+	for _, target := range targets {
 		distSq := i.State.Pos.DistanceSquaredTo(GeomVector2DFromProto(target.Position))
 
 		if distSq < minDistSq {
