@@ -1,0 +1,8 @@
+# Blue Spaceship Palette
+# Format: SYMBOL R G B A
+C 0 255 255 255
+W 255 255 255 255
+B 0 100 255 255
+D 0 0 150 255
+Y 255 200 0 255
+F 255 100 0 200

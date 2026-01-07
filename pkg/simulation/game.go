@@ -12,6 +12,7 @@ import (
 	"github.com/hajimehoshi/ebiten/v2/vector"
 	"github.com/lao-tseu-is-alive/go-swarm-simulation/pb"
 	"github.com/lao-tseu-is-alive/go-swarm-simulation/pkg/geometry"
+	"github.com/lao-tseu-is-alive/go-swarm-simulation/pkg/sprite"
 	"github.com/lao-tseu-is-alive/go-swarm-simulation/pkg/ui"
 	"github.com/tochemey/goakt/v3/actor"
 )
@@ -22,6 +23,7 @@ var (
 	redSpaceship  *ebiten.Image
 	blueSpaceship *ebiten.Image
 	trailSprite   *ebiten.Image
+	spritesLoaded bool
 )
 
 const drawTrails = false // Set to true to enable actor movement trails
@@ -78,6 +80,12 @@ type Game struct {
 // It spawns the WorldActor, sets up the UI panel with all configuration widgets,
 // and wires up callbacks for buttons and sliders.
 func GetNewGame(ctx context.Context, cfg *Config, system actor.ActorSystem) *Game {
+	// Load sprites from config paths (only once)
+	if !spritesLoaded {
+		LoadSprites(cfg)
+		spritesLoaded = true
+	}
+
 	// 1. Create Channels for communication
 	snapshotCh := make(chan *pb.WorldSnapshot, 10) // Buffer to avoid blocking
 
@@ -524,65 +532,12 @@ func (g *Game) Layout(w, h int) (int, int) { return int(g.cfg.WorldWidth), int(g
 
 func init() {
 	whiteImage.Fill(color.RGBA{R: 100, G: 200, B: 255, A: 255})
+	initTrailSprite()
+}
 
-	// --- RED Sprite Design
-	// Legend:
-	// . = Transparent
-	// G = Green (Glass/Dome)
-	// P = Purple (Hull)
-	// B = Blue (Lights)
-	// Y = Yellow (Lights)
-	// R = Red (Thrusters)
-	// W = White (Highlights)
-	design := []string{
-		"......GW......",
-		"....GGGGGG....",
-		" ...G..GG..G...",
-		"..PPPPPPPPPP..",
-		".B.P.P.P.P.B.",
-		"BBPTPTPTPTPPBB",
-		"YYPYPYPYPYPYYY",
-		".R...R..R...R.",
-		"......RR......",
-	}
-
-	// Map characters to colors
-	palette := map[rune]color.RGBA{
-		'G': {R: 50, G: 255, B: 50, A: 255},   // Alien Green
-		'W': {R: 200, G: 255, B: 200, A: 255}, // Reflection
-		'P': {R: 150, G: 50, B: 200, A: 255},  // Funky Purple
-		'T': {R: 120, G: 40, B: 180, A: 255},  // Darker Purple
-		'B': {R: 50, G: 150, B: 255, A: 255},  // Cyan/Blue lights
-		'Y': {R: 255, G: 255, B: 0, A: 255},   // Yellow lights
-		'R': {R: 255, G: 100, B: 50, A: 255},  // Engine glow
-	}
-
-	redSpaceship = generateSprite(design, palette)
-
-	// --- Blue Sprite Design (Sleek Arrow/Jet) ---
-	blueDesign := []string{
-		".......C.......",
-		"......CWC......",
-		"......CBC......",
-		".....BBBBB.....",
-		"....B.B.B.B....",
-		"...D..B.B..D...",
-		"..D...Y.Y...D..",
-		".D....F.F....D.",
-	}
-
-	bluePalette := map[rune]color.RGBA{
-		'C': {R: 0, G: 255, B: 255, A: 255},   // Cyan Tip
-		'W': {R: 255, G: 255, B: 255, A: 255}, // White Cockpit/Shine
-		'B': {R: 0, G: 100, B: 255, A: 255},   // Main Blue Body
-		'D': {R: 0, G: 0, B: 150, A: 255},     // Dark Blue Wings
-		'Y': {R: 255, G: 200, B: 0, A: 255},   // Yellow Engine Ports
-		'F': {R: 255, G: 100, B: 0, A: 200},   // Faint Engine Exhaust
-	}
-
-	blueSpaceship = generateSprite(blueDesign, bluePalette)
-
-	// ---  Pre-render a "Soft Puff" for the trail ---
+// initTrailSprite creates the procedural trail sprite
+func initTrailSprite() {
+	// Pre-render a "Soft Puff" for the trail
 	// A small 8x8 white circle with alpha gradient (so it looks like glowing gas)
 	trailSprite = ebiten.NewImage(8, 8)
 	cx, cy := 3.5, 3.5
@@ -604,6 +559,101 @@ func init() {
 			}
 		}
 	}
+}
+
+// LoadSprites loads the red and blue spaceship sprites from config paths.
+// If loading fails, it falls back to hardcoded default sprites.
+func LoadSprites(cfg *Config) {
+	var err error
+
+	// Try to load red spaceship from config paths
+	if cfg.RedSpritePath != "" && cfg.RedPalettePath != "" {
+		redSpr, loadErr := sprite.LoadSprite(cfg.RedSpritePath, cfg.RedPalettePath)
+		if loadErr == nil {
+			redSpaceship = redSpr.ToImage()
+		} else {
+			err = loadErr
+		}
+	}
+
+	// Fallback to default red sprite if loading failed or paths not set
+	if redSpaceship == nil {
+		if err != nil {
+			fmt.Printf("Warning: failed to load red sprite from files, using default: %v\n", err)
+		}
+		redSpaceship = generateDefaultRedSprite()
+	}
+
+	// Try to load blue spaceship from config paths
+	err = nil
+	if cfg.BlueSpritePath != "" && cfg.BluePalettePath != "" {
+		blueSpr, loadErr := sprite.LoadSprite(cfg.BlueSpritePath, cfg.BluePalettePath)
+		if loadErr == nil {
+			blueSpaceship = blueSpr.ToImage()
+		} else {
+			err = loadErr
+		}
+	}
+
+	// Fallback to default blue sprite if loading failed or paths not set
+	if blueSpaceship == nil {
+		if err != nil {
+			fmt.Printf("Warning: failed to load blue sprite from files, using default: %v\n", err)
+		}
+		blueSpaceship = generateDefaultBlueSprite()
+	}
+}
+
+// generateDefaultRedSprite creates the default red spaceship sprite (hardcoded fallback)
+func generateDefaultRedSprite() *ebiten.Image {
+	design := []string{
+		"......GW......",
+		"....GGGGGG....",
+		"...G..GG..G...",
+		"..PPPPPPPPPP..",
+		".B.P.P.P.P.B.",
+		"BBPTPTPTPTPPBB",
+		"YYPYPYPYPYPYYY",
+		".R...R..R...R.",
+		"......RR......",
+	}
+
+	palette := map[rune]color.RGBA{
+		'G': {R: 50, G: 255, B: 50, A: 255},
+		'W': {R: 200, G: 255, B: 200, A: 255},
+		'P': {R: 150, G: 50, B: 200, A: 255},
+		'T': {R: 120, G: 40, B: 180, A: 255},
+		'B': {R: 50, G: 150, B: 255, A: 255},
+		'Y': {R: 255, G: 255, B: 0, A: 255},
+		'R': {R: 255, G: 100, B: 50, A: 255},
+	}
+
+	return generateSprite(design, palette)
+}
+
+// generateDefaultBlueSprite creates the default blue spaceship sprite (hardcoded fallback)
+func generateDefaultBlueSprite() *ebiten.Image {
+	design := []string{
+		".......C.......",
+		"......CWC......",
+		"......CBC......",
+		".....BBBBB.....",
+		"....B.B.B.B....",
+		"...D..B.B..D...",
+		"..D...Y.Y...D..",
+		".D....F.F....D.",
+	}
+
+	palette := map[rune]color.RGBA{
+		'C': {R: 0, G: 255, B: 255, A: 255},
+		'W': {R: 255, G: 255, B: 255, A: 255},
+		'B': {R: 0, G: 100, B: 255, A: 255},
+		'D': {R: 0, G: 0, B: 150, A: 255},
+		'Y': {R: 255, G: 200, B: 0, A: 255},
+		'F': {R: 255, G: 100, B: 0, A: 200},
+	}
+
+	return generateSprite(design, palette)
 }
 
 // generateSprite converts an ASCII grid into an Ebiten image

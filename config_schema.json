@@ -109,6 +109,22 @@
     "displayDefenseCircle": {
       "type": "boolean",
       "description": "Toggle drawing of defense radius for Blue actors."
+    },
+    "redSpritePath": {
+      "type": "string",
+      "description": "Path to the red spaceship sprite design file."
+    },
+    "redPalettePath": {
+      "type": "string",
+      "description": "Path to the red spaceship palette file."
+    },
+    "blueSpritePath": {
+      "type": "string",
+      "description": "Path to the blue spaceship sprite design file."
+    },
+    "bluePalettePath": {
+      "type": "string",
+      "description": "Path to the blue spaceship palette file."
     }
   },
   "required": [

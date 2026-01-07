@@ -18,5 +18,9 @@
   "logFormat": "text",
   "logLevel": "info",
   "displayDetectionCircle": false,
-  "displayDefenseCircle": false
+  "displayDefenseCircle": false,
+  "redSpritePath": "assets/sprites/red_spaceship.sprite",
+  "redPalettePath": "assets/sprites/red_spaceship.palette",
+  "blueSpritePath": "assets/sprites/blue_spaceship.sprite",
+  "bluePalettePath": "assets/sprites/blue_spaceship.palette"
 }

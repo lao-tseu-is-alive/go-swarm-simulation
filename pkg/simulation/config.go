@@ -115,6 +115,19 @@ type Config struct {
 	// DisplayDefenseCircle toggles drawing the defense radius around Blue actors.
 	// UI Label: "Show Defense Circle"
 	DisplayDefenseCircle bool `json:"displayDefenseCircle"`
+
+	// =========================================================================
+	// SPRITES (not exposed in UI)
+	// =========================================================================
+
+	// RedSpritePath is the path to the red spaceship sprite design file.
+	RedSpritePath string `json:"redSpritePath"`
+	// RedPalettePath is the path to the red spaceship palette file.
+	RedPalettePath string `json:"redPalettePath"`
+	// BlueSpritePath is the path to the blue spaceship sprite design file.
+	BlueSpritePath string `json:"blueSpritePath"`
+	// BluePalettePath is the path to the blue spaceship palette file.
+	BluePalettePath string `json:"bluePalettePath"`
 }
 
 // DefaultConfig returns a Config with sensible default values.
@@ -141,6 +154,10 @@ func DefaultConfig() *Config {
 		LogFormat:              "json",
 		DisplayDetectionCircle: false,
 		DisplayDefenseCircle:   false,
+		RedSpritePath:          "assets/sprites/red_spaceship.sprite",
+		RedPalettePath:         "assets/sprites/red_spaceship.palette",
+		BlueSpritePath:         "assets/sprites/blue_spaceship.sprite",
+		BluePalettePath:        "assets/sprites/blue_spaceship.palette",
 	}
 }
 
