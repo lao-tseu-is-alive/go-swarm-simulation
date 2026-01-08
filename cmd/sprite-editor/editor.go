@@ -3,6 +3,7 @@
 // - Load and edit sprites and palettes from text files
 // - View sprites in magnified (pixel editing) and 1:1 (preview) modes
 // - Edit palette colors with RGB sliders
+// - Add new colors to the palette
 // - Save changes back to files
 //
 // Usage:
@@ -46,6 +47,10 @@ type Editor struct {
 	editB, editA    int
 	colorSliderDrag int // 0=none, 1=R, 2=G, 3=B, 4=A
 
+	// Add new color mode
+	addingColor    bool
+	newColorSymbol rune
+
 	// UI state
 	statusMsg string
 }
@@ -63,25 +68,17 @@ func NewEditor(spritePath, palettePath string) (*Editor, error) {
 	} else {
 		// Create a new empty sprite
 		spr = sprite.NewSprite(16, 16)
-		spr.Palette.SetColor('.', color.RGBA{R: 0, G: 0, B: 0, A: 0})
 		spr.Palette.SetColor('X', color.RGBA{R: 255, G: 0, B: 0, A: 255})
 		spr.Palette.SetColor('O', color.RGBA{R: 0, G: 255, B: 0, A: 255})
 		spr.Palette.SetColor('#', color.RGBA{R: 0, G: 0, B: 255, A: 255})
-	}
-
-	// Default selected rune
-	symbols := spr.Palette.Symbols()
-	selected := '.'
-	if len(symbols) > 0 {
-		selected = symbols[0]
 	}
 
 	return &Editor{
 		sprite:       spr,
 		spritePath:   spritePath,
 		palettePath:  palettePath,
-		selectedRune: selected,
-		statusMsg:    "Ready. Click on sprite to paint. Press S to save.",
+		selectedRune: '.',
+		statusMsg:    "Ready. S=Save  Left-click=Paint  Right-click=Edit Color  N=New Color",
 	}, nil
 }
 
@@ -90,11 +87,42 @@ func (e *Editor) Update() error {
 	if inpututil.IsKeyJustPressed(ebiten.KeyS) {
 		e.save()
 	}
+	if inpututil.IsKeyJustPressed(ebiten.KeyN) && !e.editingColor && !e.addingColor {
+		e.startAddColor()
+	}
 	if inpututil.IsKeyJustPressed(ebiten.KeyEscape) {
 		if e.editingColor {
 			e.editingColor = false
+			e.statusMsg = "Color editor closed."
+		} else if e.addingColor {
+			e.addingColor = false
+			e.statusMsg = "Add color cancelled."
 		} else {
 			os.Exit(0)
+		}
+	}
+	if inpututil.IsKeyJustPressed(ebiten.KeyEnter) {
+		if e.editingColor {
+			e.editingColor = false
+			e.statusMsg = fmt.Sprintf("Color '%c' saved.", e.editColorRune)
+		} else if e.addingColor {
+			e.finishAddColor()
+		}
+	}
+
+	// Handle typing new symbol when adding color
+	if e.addingColor {
+		for r := 'A'; r <= 'Z'; r++ {
+			if inpututil.IsKeyJustPressed(ebiten.Key(int(ebiten.KeyA) + int(r-'A'))) {
+				e.newColorSymbol = r
+				e.statusMsg = fmt.Sprintf("New color symbol: '%c' - Press Enter to add, ESC to cancel", r)
+			}
+		}
+		for r := '0'; r <= '9'; r++ {
+			if inpututil.IsKeyJustPressed(ebiten.Key(int(ebiten.Key0) + int(r-'0'))) {
+				e.newColorSymbol = r
+				e.statusMsg = fmt.Sprintf("New color symbol: '%c' - Press Enter to add, ESC to cancel", r)
+			}
 		}
 	}
 
@@ -107,7 +135,12 @@ func (e *Editor) Update() error {
 	spriteAreaW := e.sprite.Width() * pixelSize
 	spriteAreaH := e.sprite.Height() * pixelSize
 
-	if ebiten.IsMouseButtonPressed(ebiten.MouseButtonLeft) && !e.editingColor {
+	// Palette area
+	paletteX := 20
+	paletteY := spriteAreaY + spriteAreaH + 40
+
+	// Handle left-click: painting and palette selection
+	if ebiten.IsMouseButtonPressed(ebiten.MouseButtonLeft) && !e.editingColor && !e.addingColor {
 		// Check if clicking on sprite area
 		if mx >= spriteAreaX && mx < spriteAreaX+spriteAreaW &&
 			my >= spriteAreaY && my < spriteAreaY+spriteAreaH {
@@ -119,10 +152,13 @@ func (e *Editor) Update() error {
 			}
 		}
 
-		// Check if clicking on palette
-		paletteX := 20
-		paletteY := spriteAreaY + spriteAreaH + 40
-		e.handlePaletteClick(mx, my, paletteX, paletteY)
+		// Check if clicking on palette (left-click selects color)
+		e.handlePaletteLeftClick(mx, my, paletteX, paletteY)
+	}
+
+	// Handle right-click: palette color editing (separate from left-click block!)
+	if inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonRight) && !e.editingColor && !e.addingColor {
+		e.handlePaletteRightClick(mx, my, paletteX, paletteY)
 	}
 
 	// Handle color slider dragging
@@ -138,27 +174,49 @@ func (e *Editor) Update() error {
 	return nil
 }
 
-func (e *Editor) handlePaletteClick(mx, my, paletteX, paletteY int) {
-	symbols := e.sprite.Palette.Symbols()
+// handlePaletteLeftClick handles left-click on palette swatches (color selection)
+func (e *Editor) handlePaletteLeftClick(mx, my, paletteX, paletteY int) {
 	swatchSize := 30
 	swatchGap := 5
 
-	for i, sym := range symbols {
-		x := paletteX + i*(swatchSize+swatchGap)
-		y := paletteY
+	// Check transparent/eraser button first (always at position 0)
+	eraserX := paletteX
+	if mx >= eraserX && mx < eraserX+swatchSize && my >= paletteY && my < paletteY+swatchSize {
+		if inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonLeft) {
+			e.selectedRune = '.'
+			e.statusMsg = "Selected: '.' (Transparent/Eraser)"
+			return
+		}
+	}
 
-		if mx >= x && mx < x+swatchSize && my >= y && my < y+swatchSize {
+	// Check palette colors (offset by 1 for eraser button)
+	symbols := e.sprite.Palette.Symbols()
+	for i, sym := range symbols {
+		x := paletteX + (i+1)*(swatchSize+swatchGap)
+
+		if mx >= x && mx < x+swatchSize && my >= paletteY && my < paletteY+swatchSize {
 			if inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonLeft) {
 				e.selectedRune = sym
 				e.statusMsg = fmt.Sprintf("Selected: '%c'", sym)
+				return
 			}
 		}
+	}
+}
 
-		// Double-click to edit color
-		if mx >= x && mx < x+swatchSize && my >= y && my < y+swatchSize {
-			if inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonRight) {
-				e.startColorEdit(sym)
-			}
+// handlePaletteRightClick handles right-click on palette swatches (color editing)
+func (e *Editor) handlePaletteRightClick(mx, my, paletteX, paletteY int) {
+	swatchSize := 30
+	swatchGap := 5
+
+	// Palette colors start after eraser button
+	symbols := e.sprite.Palette.Symbols()
+	for i, sym := range symbols {
+		x := paletteX + (i+1)*(swatchSize+swatchGap)
+
+		if mx >= x && mx < x+swatchSize && my >= paletteY && my < paletteY+swatchSize {
+			e.startColorEdit(sym)
+			return
 		}
 	}
 }
@@ -171,7 +229,30 @@ func (e *Editor) startColorEdit(sym rune) {
 	e.editG = int(c.G)
 	e.editB = int(c.B)
 	e.editA = int(c.A)
-	e.statusMsg = fmt.Sprintf("Editing color '%c'. Press ESC to close.", sym)
+	e.statusMsg = fmt.Sprintf("Editing '%c'. Drag sliders. ENTER=Save, ESC=Cancel", sym)
+}
+
+func (e *Editor) startAddColor() {
+	e.addingColor = true
+	e.newColorSymbol = 'A'
+	e.statusMsg = "Type a letter/number for new color symbol, then ENTER to add"
+}
+
+func (e *Editor) finishAddColor() {
+	if e.newColorSymbol == 0 || e.newColorSymbol == '.' {
+		e.statusMsg = "Invalid symbol. Use a letter or number."
+		return
+	}
+	if _, exists := e.sprite.Palette.GetColor(e.newColorSymbol); exists {
+		e.statusMsg = fmt.Sprintf("Symbol '%c' already exists!", e.newColorSymbol)
+		return
+	}
+	// Add new color with random-ish default
+	e.sprite.Palette.SetColor(e.newColorSymbol, color.RGBA{R: 128, G: 128, B: 128, A: 255})
+	e.dirty = true
+	e.addingColor = false
+	e.selectedRune = e.newColorSymbol
+	e.statusMsg = fmt.Sprintf("Added color '%c'. Right-click to edit its color.", e.newColorSymbol)
 }
 
 func (e *Editor) handleColorSliders(mx, my int) {
@@ -212,7 +293,7 @@ func (e *Editor) handleColorSliders(mx, my int) {
 			e.editA = val
 		}
 
-		// Update palette color
+		// Update palette color in real-time
 		e.sprite.Palette.SetColor(e.editColorRune, color.RGBA{
 			R: uint8(e.editR),
 			G: uint8(e.editG),
@@ -254,8 +335,13 @@ func (e *Editor) Draw(screen *ebiten.Image) {
 		e.drawColorEditor(screen, 480, 380)
 	}
 
+	// Draw add color dialog if active
+	if e.addingColor {
+		e.drawAddColorDialog(screen, 480, 380)
+	}
+
 	// Instructions
-	instructions := "S=Save  ESC=Exit/Close  Left-click=Paint  Right-click=Edit Color"
+	instructions := "S=Save  N=New Color  ESC=Exit/Cancel  ENTER=Confirm"
 	ebitenutil.DebugPrintAt(screen, instructions, 20, screenHeight-25)
 }
 
@@ -264,13 +350,18 @@ func (e *Editor) drawMagnifiedSprite(screen *ebiten.Image, x, y int) {
 
 	for py := 0; py < e.sprite.Height(); py++ {
 		for px := 0; px < e.sprite.Width(); px++ {
-			c := e.sprite.GetColor(px, py)
+			sym := e.sprite.GetPixel(px, py)
 
-			// Draw pixel
-			vector.FillRect(screen,
-				float32(x+px*pixelSize), float32(y+py*pixelSize),
-				float32(pixelSize-1), float32(pixelSize-1),
-				c, true)
+			// Draw checkerboard for transparent pixels
+			if sym == '.' {
+				e.drawCheckerboard(screen, x+px*pixelSize, y+py*pixelSize, pixelSize-1)
+			} else {
+				c := e.sprite.GetColor(px, py)
+				vector.FillRect(screen,
+					float32(x+px*pixelSize), float32(y+py*pixelSize),
+					float32(pixelSize-1), float32(pixelSize-1),
+					c, true)
+			}
 
 			// Draw grid
 			vector.StrokeRect(screen,
@@ -301,12 +392,25 @@ func (e *Editor) drawPreview(screen *ebiten.Image, x, y int) {
 func (e *Editor) drawPalette(screen *ebiten.Image, x, y int) {
 	ebitenutil.DebugPrintAt(screen, "Palette (Right-click to edit):", x, y-15)
 
-	symbols := e.sprite.Palette.Symbols()
 	swatchSize := 30
 	gap := 5
 
+	// Draw transparent/eraser button first (checkerboard pattern)
+	eraserX := x
+	e.drawCheckerboard(screen, eraserX, y, swatchSize)
+
+	// Highlight if eraser selected
+	eraserBorder := color.RGBA{R: 100, G: 100, B: 100, A: 255}
+	if e.selectedRune == '.' {
+		eraserBorder = color.RGBA{R: 255, G: 255, B: 0, A: 255}
+	}
+	vector.StrokeRect(screen, float32(eraserX), float32(y), float32(swatchSize), float32(swatchSize), 2, eraserBorder, true)
+	ebitenutil.DebugPrintAt(screen, ".", eraserX+12, y+swatchSize+5)
+
+	// Draw palette colors (offset by 1 for eraser button)
+	symbols := e.sprite.Palette.Symbols()
 	for i, sym := range symbols {
-		sx := x + i*(swatchSize+gap)
+		sx := x + (i+1)*(swatchSize+gap)
 		c, _ := e.sprite.Palette.GetColor(sym)
 
 		// Draw swatch
@@ -324,16 +428,42 @@ func (e *Editor) drawPalette(screen *ebiten.Image, x, y int) {
 	}
 }
 
+// drawCheckerboard draws a checkerboard pattern to indicate transparency
+func (e *Editor) drawCheckerboard(screen *ebiten.Image, x, y, size int) {
+	checkSize := 6
+	light := color.RGBA{R: 200, G: 200, B: 200, A: 255}
+	dark := color.RGBA{R: 120, G: 120, B: 120, A: 255}
+
+	for cy := 0; cy < size; cy += checkSize {
+		for cx := 0; cx < size; cx += checkSize {
+			c := light
+			if (cx/checkSize+cy/checkSize)%2 == 0 {
+				c = dark
+			}
+			w := checkSize
+			h := checkSize
+			if cx+w > size {
+				w = size - cx
+			}
+			if cy+h > size {
+				h = size - cy
+			}
+			vector.FillRect(screen, float32(x+cx), float32(y+cy), float32(w), float32(h), c, true)
+		}
+	}
+}
+
 func (e *Editor) drawColorEditor(screen *ebiten.Image, x, y int) {
 	// Background panel
-	vector.FillRect(screen, float32(x), float32(y), 250, 180, color.RGBA{R: 60, G: 60, B: 70, A: 240}, true)
-	vector.StrokeRect(screen, float32(x), float32(y), 250, 180, 2, color.RGBA{R: 200, G: 200, B: 200, A: 255}, true)
+	vector.FillRect(screen, float32(x), float32(y), 280, 200, color.RGBA{R: 60, G: 60, B: 70, A: 250}, true)
+	vector.StrokeRect(screen, float32(x), float32(y), 280, 200, 2, color.RGBA{R: 200, G: 200, B: 200, A: 255}, true)
 
 	title := fmt.Sprintf("Edit Color: '%c'", e.editColorRune)
 	ebitenutil.DebugPrintAt(screen, title, x+10, y+10)
+	ebitenutil.DebugPrintAt(screen, "ENTER=Save  ESC=Cancel", x+10, y+25)
 
-	sliderX := x + 20
-	sliderY := y + 40
+	sliderX := x + 40
+	sliderY := y + 50
 	sliderW := 200
 	sliderH := 15
 	gap := 30
@@ -351,7 +481,7 @@ func (e *Editor) drawColorEditor(screen *ebiten.Image, x, y int) {
 		sy := sliderY + i*gap
 
 		// Label
-		ebitenutil.DebugPrintAt(screen, fmt.Sprintf("%s: %3d", labels[i], values[i]), sliderX-20, sy)
+		ebitenutil.DebugPrintAt(screen, fmt.Sprintf("%s:%3d", labels[i], values[i]), sliderX-35, sy)
 
 		// Slider background
 		vector.FillRect(screen, float32(sliderX), float32(sy), float32(sliderW), float32(sliderH),
@@ -368,7 +498,18 @@ func (e *Editor) drawColorEditor(screen *ebiten.Image, x, y int) {
 
 	// Preview of edited color
 	previewColor := color.RGBA{R: uint8(e.editR), G: uint8(e.editG), B: uint8(e.editB), A: uint8(e.editA)}
-	vector.FillRect(screen, float32(x+180), float32(y+10), 50, 20, previewColor, true)
+	vector.FillRect(screen, float32(x+200), float32(y+10), 60, 30, previewColor, true)
+	vector.StrokeRect(screen, float32(x+200), float32(y+10), 60, 30, 1, color.RGBA{R: 255, G: 255, B: 255, A: 255}, true)
+}
+
+func (e *Editor) drawAddColorDialog(screen *ebiten.Image, x, y int) {
+	// Background panel
+	vector.FillRect(screen, float32(x), float32(y), 280, 80, color.RGBA{R: 60, G: 60, B: 70, A: 250}, true)
+	vector.StrokeRect(screen, float32(x), float32(y), 280, 80, 2, color.RGBA{R: 200, G: 200, B: 200, A: 255}, true)
+
+	ebitenutil.DebugPrintAt(screen, "Add New Color", x+10, y+10)
+	ebitenutil.DebugPrintAt(screen, fmt.Sprintf("Symbol: %c", e.newColorSymbol), x+10, y+30)
+	ebitenutil.DebugPrintAt(screen, "Type A-Z or 0-9, then ENTER", x+10, y+50)
 }
 
 func (e *Editor) save() {

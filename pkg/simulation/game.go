@@ -513,7 +513,7 @@ func (g *Game) updateTrails(snap *pb.WorldSnapshot) {
 			}
 
 			// Limit trail length (e.g., keep last 20 frames)
-			maxLen := 20
+			maxLen := 7
 			if len(g.trails[a.Id]) > maxLen {
 				g.trails[a.Id] = g.trails[a.Id][1:]
 			}
