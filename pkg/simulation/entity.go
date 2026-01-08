@@ -1,6 +1,9 @@
 package simulation
 
 import (
+	"math"
+	"math/rand"
+
 	"github.com/lao-tseu-is-alive/go-swarm-simulation/pb"
 	"github.com/lao-tseu-is-alive/go-swarm-simulation/pkg/geometry"
 )
@@ -57,11 +60,16 @@ func (e *Entity) UpdateFromProto(p *pb.ActorState) {
 // ClampVelocity ensures the entity's speed stays within [minSpeed, maxSpeed].
 // If speed exceeds maxSpeed, velocity is scaled down.
 // If speed is below minSpeed (and non-zero), velocity is scaled up.
+// If speed is exactly zero, a small random velocity is applied to prevent stalling.
 func (e *Entity) ClampVelocity(minSpeed, maxSpeed float64) {
 	speed := e.Vel.Len()
 	if speed > maxSpeed {
 		e.Vel = e.Vel.Mul(maxSpeed / speed)
-	} else if speed < minSpeed && speed > 0 {
+	} else if speed == 0 {
+		// Zero velocity: give a random kick in a random direction to prevent stalling
+		angle := rand.Float64() * 2 * math.Pi
+		e.Vel = geometry.Vector2D{X: math.Cos(angle) * minSpeed, Y: math.Sin(angle) * minSpeed}
+	} else if speed < minSpeed {
 		e.Vel = e.Vel.Mul(minSpeed / speed)
 	}
 }
