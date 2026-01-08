@@ -8,6 +8,8 @@ import (
 	"github.com/hajimehoshi/ebiten/v2/vector"
 )
 
+const defaultMarginHeight = 25
+
 // UIWidget is an interface for all UI widgets
 type UIWidget interface {
 	Update()
@@ -21,7 +23,7 @@ type SliderWrapper struct {
 }
 
 func (s *SliderWrapper) GetHeight() float64 {
-	return s.H + 25 // Slider height + label space
+	return s.H + defaultMarginHeight // Slider height + label space
 }
 
 // CheckboxWrapper wraps Checkbox to implement UIWidget
@@ -30,7 +32,7 @@ type CheckboxWrapper struct {
 }
 
 func (c *CheckboxWrapper) GetHeight() float64 {
-	return c.Size + 25 // Checkbox size + label space + margin
+	return c.Size + defaultMarginHeight - 5
 }
 
 // ButtonWrapper wraps Button to implement UIWidget
@@ -197,7 +199,7 @@ func (p *UIPanel) calculateNextYOffset() float64 {
 
 	// Add section header heights (20px each)
 	for range p.sections {
-		offset += 25
+		offset += defaultMarginHeight
 	}
 
 	// Add all widget heights
@@ -288,7 +290,7 @@ func (p *UIPanel) Draw(screen *ebiten.Image) {
 
 	for sectionIdx, section := range p.sections {
 		// Draw section header
-		if currentY >= p.Y-25 && currentY <= p.Y+p.Height {
+		if currentY >= p.Y-defaultMarginHeight && currentY <= p.Y+p.Height {
 			sectionBG := color.RGBA{R: 60, G: 60, B: 70, A: 255}
 			vector.FillRect(screen,
 				float32(p.X+5), float32(currentY),
@@ -314,7 +316,7 @@ func (p *UIPanel) Draw(screen *ebiten.Image) {
 			ebitenutil.DebugPrintAt(screen, section.Title,
 				int(textX), int(currentY+5))
 		}
-		currentY += 25
+		currentY += defaultMarginHeight
 
 		// Draw widgets in this section
 		for widgetIdx < section.EndIndex && widgetIdx < len(p.Widgets) {
@@ -410,7 +412,7 @@ func (p *UIPanel) calculateTotalHeight() float64 {
 	height := 30.0 // Title space
 
 	// Add section headers
-	height += float64(len(p.sections)) * 25
+	height += float64(len(p.sections)) * defaultMarginHeight
 
 	// Add all widgets
 	for _, widget := range p.Widgets {
