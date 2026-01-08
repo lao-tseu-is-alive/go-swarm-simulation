@@ -288,29 +288,15 @@ func (w *WorldActor) sendConvert(ctx *actor.ReceiveContext, targetID string, new
 }
 
 func (w *WorldActor) spawnSwarm(ctx *actor.ReceiveContext) {
-	var (
-		redX     = w.cfg.WorldWidth / 6
-		redY     = w.cfg.WorldHeight / 6
-		incRedX  = math.Min(w.cfg.WorldHeight/float64(w.cfg.NumRedAtStart), w.cfg.RedDetectionRange)
-		incRedY  = math.Min(w.cfg.WorldHeight/float64(w.cfg.NumRedAtStart), w.cfg.RedDetectionRange)
-		blueX    = (w.cfg.WorldWidth / 4) * 2
-		blueY    = (w.cfg.WorldHeight / 4) * 2
-		incBlueX = math.Min(w.cfg.WorldHeight/float64(w.cfg.NumBlueAtStart), w.cfg.BlueDefenseRange)
-		incBlueY = math.Min(w.cfg.WorldHeight/float64(w.cfg.NumBlueAtStart), w.cfg.BlueDefenseRange)
-	)
 	// 1. SPAWN REDS
 	for i := 0; i < w.cfg.NumRedAtStart; i++ {
-		name := fmt.Sprintf("Red-%03d", i)
-		startX := redX + float64(i)*incRedX*rand.Float64()*2
-		startY := redY + float64(i)*incRedY*rand.Float64()*2
-		// Bounds check spawn
-		if startX > w.cfg.WorldWidth-50 {
-			startX = 50 + float64(i)*5
-		}
-		if startY > w.cfg.WorldHeight-50 {
-			startY = 50 + float64(i)*5
-		}
-		// Calculate Random Velocity HERE
+		name := fmt.Sprintf("Red-%04d", i)
+
+		// Stochastic Placement: Uniform random distribution across the entire map
+		startX := rand.Float64() * w.cfg.WorldWidth
+		startY := rand.Float64() * w.cfg.WorldHeight
+
+		// Random Velocity: range [-1, 1]
 		vx := (rand.Float64() - 0.5) * 2
 		vy := (rand.Float64() - 0.5) * 2
 
@@ -318,35 +304,22 @@ func (w *WorldActor) spawnSwarm(ctx *actor.ReceiveContext) {
 		w.pids = append(w.pids, pid)
 		w.pidsCache[name] = pid
 
-		// We must insert the actor into the map NOW, so the very first Tick loop
-		// sees it and sends it a message.
 		w.entities[name] = &Entity{
 			ID:    name,
 			Color: pb.TeamColor_TEAM_RED,
-			Pos: geometry.Vector2D{
-				X: startX,
-				Y: startY,
-			},
-			Vel: geometry.Vector2D{
-				X: vx,
-				Y: vy,
-			},
+			Pos:   geometry.Vector2D{X: startX, Y: startY},
+			Vel:   geometry.Vector2D{X: vx, Y: vy},
 		}
 	}
 
 	// 2. SPAWN BLUES
 	for i := 0; i < w.cfg.NumBlueAtStart; i++ {
-		name := fmt.Sprintf("Blue-%03d", i)
+		name := fmt.Sprintf("Blue-%04d", i)
 
-		startX := blueX + float64(i)*incBlueX*rand.Float64()*2
-		startY := blueY + (float64(i%5)*incBlueY)*rand.Float64()*2
-		// Bounds check spawn
-		if startX > w.cfg.WorldWidth-50 {
-			startX = 50 + float64(i)*5
-		}
-		if startY > w.cfg.WorldHeight-50 {
-			startY = 50 + float64(i)*5
-		}
+		// Stochastic Placement: Uniform random distribution
+		startX := rand.Float64() * w.cfg.WorldWidth
+		startY := rand.Float64() * w.cfg.WorldHeight
+
 		vx := (rand.Float64() - 0.5) * 2
 		vy := (rand.Float64() - 0.5) * 2
 

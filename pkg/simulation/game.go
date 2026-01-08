@@ -710,6 +710,7 @@ func (g *Game) restartSimulation() {
 	worldPID, err := g.System.Spawn(g.ctx, "world", worldActor)
 	if err != nil {
 		// If spawn fails, keep the old PID
+		fmt.Errorf("error in restartSimulation doing g.System.Spawn :%v", err)
 		return
 	}
 	g.worldPID = worldPID
