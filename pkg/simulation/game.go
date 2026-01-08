@@ -19,14 +19,13 @@ import (
 
 // Pre-rendered sprites for fast batched drawing
 var (
-	whiteImage    = ebiten.NewImage(3, 3)
 	redSpaceship  *ebiten.Image
 	blueSpaceship *ebiten.Image
 	trailSprite   *ebiten.Image
 	spritesLoaded bool
 )
 
-const drawTrails = false // Set to true to enable actor movement trails
+const maxTrailLength = 9
 
 // Game implements the ebiten.Game interface and manages the simulation lifecycle.
 // It coordinates between the UI, actor system, and rendering.
@@ -83,7 +82,8 @@ type Game struct {
 func GetNewGame(ctx context.Context, cfg *Config, system actor.ActorSystem) *Game {
 	// Load sprites from config paths (only once)
 	if !spritesLoaded {
-		LoadSprites(cfg)
+		redSpaceship, blueSpaceship = sprite.LoadGameSprites(cfg.RedSpritePath, cfg.RedPalettePath, cfg.BlueSpritePath, cfg.BluePalettePath)
+		trailSprite = sprite.GetTrailSprite()
 		spritesLoaded = true
 	}
 
@@ -273,80 +273,50 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	if g.lastState != nil {
 		for _, entity := range g.lastState.Actors {
 			if entity.Color == pb.TeamColor_TEAM_RED {
-				if drawTrails {
-					// --- 1. NEW: Draw Glowing Trail ---
-					if trace, ok := g.trails[entity.Id]; ok && len(trace) > 1 {
-						for i, pos := range trace {
-							// Calculate progress (0.0 = tail, 1.0 = engine)
-							p := float64(i) / float64(len(trace))
+				// Draw Glowing Trail (Sprite Batching) ---
+				if trace, ok := g.trails[entity.Id]; ok && len(trace) > 1 {
+					// Re-use a single Options struct to avoid allocation overhead in the loop
+					trailOp := &ebiten.DrawImageOptions{}
 
-							// Size varies: 0 at tail, 6 at engine
-							radius := float32(3.0 * p)
+					// Center of the 8x8 sprite
+					originOffset := 4.0
 
-							// Color Logic: Fire Gradient
-							// Tail is Red/Transparent, Head is Yellow/White
-							var r, gr, b, a uint8
-							if p > 0.8 {
-								// Core (White/Yellow)
-								r, gr, b, a = 255, 255, 100, 200
-							} else if p > 0.5 {
-								// Middle (Orange)
-								r, gr, b, a = 255, 140, 0, 150
-							} else {
-								// Tail (Red fading out)
-								r, gr, b, a = 255, 0, 0, uint8(100*p)
-							}
+					for i, pos := range trace {
+						// Progress: 0.0 (Tail) -> 1.0 (Engine)
+						p := float64(i) / float64(len(trace))
 
-							// Draw the puff
-							vector.FillCircle(screen, float32(pos.X), float32(pos.Y), radius, color.RGBA{R: r, G: gr, B: b, A: a}, true)
+						// Skip the very tail if it's too faint
+						if p < 0.2 {
+							continue
 						}
-					}
-				} else {
-					// --- 1. OPTIMIZED: Draw Glowing Trail (Sprite Batching) ---
-					if trace, ok := g.trails[entity.Id]; ok && len(trace) > 1 {
-						// Re-use a single Options struct to avoid allocation overhead in the loop
-						trailOp := &ebiten.DrawImageOptions{}
 
-						// Center of the 8x8 sprite
-						originOffset := 4.0
+						trailOp.GeoM.Reset()
+						trailOp.ColorScale.Reset()
 
-						for i, pos := range trace {
-							// Progress: 0.0 (Tail) -> 1.0 (Engine)
-							p := float64(i) / float64(len(trace))
+						// 1. Scale:
+						// Start small (0.5), grow to 1.5 at the engine
+						scale := 0.5 + p
+						trailOp.GeoM.Translate(-originOffset, -originOffset) // Center pivot
+						trailOp.GeoM.Scale(scale, scale)
+						trailOp.GeoM.Translate(pos.X, pos.Y) // Move to world position
 
-							// Skip the very tail if it's too faint
-							if p < 0.2 {
-								continue
-							}
+						// 2. Color Logic (Fire Gradient):
+						// We use ColorScale to tint the white sprite.
+						// High alpha at head, fading to 0 at tail.
+						alpha := float32(p * 0.8) // Max opacity 0.8
 
-							trailOp.GeoM.Reset()
-							trailOp.ColorScale.Reset()
-
-							// 1. Scale:
-							// Start small (0.5), grow to 1.5 at the engine
-							scale := 0.5 + p
-							trailOp.GeoM.Translate(-originOffset, -originOffset) // Center pivot
-							trailOp.GeoM.Scale(scale, scale)
-							trailOp.GeoM.Translate(pos.X, pos.Y) // Move to world position
-
-							// 2. Color Logic (Fire Gradient):
-							// We use ColorScale to tint the white sprite.
-							// High alpha at head, fading to 0 at tail.
-							alpha := float32(p * 0.8) // Max opacity 0.8
-
-							if p > 0.8 {
-								// White/Yellow Core
-								trailOp.ColorScale.Scale(1, 1, 0.5, alpha)
-							} else if p > 0.5 {
-								// Orange Body
-								trailOp.ColorScale.Scale(1, 0.5, 0, alpha)
-							} else {
-								// Red/Smoke Tail
-								trailOp.ColorScale.Scale(0.8, 0, 0, alpha)
-							}
-
-							screen.DrawImage(trailSprite, trailOp)
+						if p > 0.8 {
+							// White/Yellow Core
+							trailOp.ColorScale.Scale(1, 1, 0.5, alpha)
+						} else if p > 0.5 {
+							// Orange Body
+							trailOp.ColorScale.Scale(1, 0.5, 0, alpha)
+						} else {
+							// Red/Smoke Tail
+							trailOp.ColorScale.Scale(0.8, 0, 0, alpha)
 						}
+
+						screen.DrawImage(trailSprite, trailOp)
 					}
 				}
 
@@ -522,7 +492,7 @@ func (g *Game) updateTrails(snap *pb.WorldSnapshot) {
 			}
 
 			// Limit trail length (e.g., keep last 20 frames)
-			maxLen := 7
+			maxLen := maxTrailLength
 			if len(g.trails[a.Id]) > maxLen {
 				g.trails[a.Id] = g.trails[a.Id][1:]
 			}
@@ -538,148 +508,6 @@ func (g *Game) updateTrails(snap *pb.WorldSnapshot) {
 }
 
 func (g *Game) Layout(w, h int) (int, int) { return int(g.cfg.WorldWidth), int(g.cfg.WorldHeight) }
-
-func init() {
-	whiteImage.Fill(color.RGBA{R: 100, G: 200, B: 255, A: 255})
-	initTrailSprite()
-}
-
-// initTrailSprite creates the procedural trail sprite
-func initTrailSprite() {
-	// Pre-render a "Soft Puff" for the trail
-	// A small 8x8 white circle with alpha gradient (so it looks like glowing gas)
-	trailSprite = ebiten.NewImage(8, 8)
-	cx, cy := 3.5, 3.5
-	r := 3.5
-
-	// Scan pixels to create a radial gradient
-	for y := 0; y < 8; y++ {
-		for x := 0; x < 8; x++ {
-			dx := float64(x) - cx
-			dy := float64(y) - cy
-			dist := math.Sqrt(dx*dx + dy*dy)
-
-			if dist < r {
-				// Alpha fades out towards edge
-				alpha := 1.0 - (dist / r)
-				// Use pure white so we can tint it later with ColorScale
-				c := uint8(255 * alpha)
-				trailSprite.Set(x, y, color.RGBA{R: 255, G: 255, B: 255, A: c})
-			}
-		}
-	}
-}
-
-// LoadSprites loads the red and blue spaceship sprites from config paths.
-// If loading fails, it falls back to hardcoded default sprites.
-func LoadSprites(cfg *Config) {
-	var err error
-
-	// Try to load red spaceship from config paths
-	if cfg.RedSpritePath != "" && cfg.RedPalettePath != "" {
-		redSpr, loadErr := sprite.LoadSprite(cfg.RedSpritePath, cfg.RedPalettePath)
-		if loadErr == nil {
-			redSpaceship = redSpr.ToImage()
-		} else {
-			err = loadErr
-		}
-	}
-
-	// Fallback to default red sprite if loading failed or paths not set
-	if redSpaceship == nil {
-		if err != nil {
-			fmt.Printf("Warning: failed to load red sprite from files, using default: %v\n", err)
-		}
-		redSpaceship = generateDefaultRedSprite()
-	}
-
-	// Try to load blue spaceship from config paths
-	err = nil
-	if cfg.BlueSpritePath != "" && cfg.BluePalettePath != "" {
-		blueSpr, loadErr := sprite.LoadSprite(cfg.BlueSpritePath, cfg.BluePalettePath)
-		if loadErr == nil {
-			blueSpaceship = blueSpr.ToImage()
-		} else {
-			err = loadErr
-		}
-	}
-
-	// Fallback to default blue sprite if loading failed or paths not set
-	if blueSpaceship == nil {
-		if err != nil {
-			fmt.Printf("Warning: failed to load blue sprite from files, using default: %v\n", err)
-		}
-		blueSpaceship = generateDefaultBlueSprite()
-	}
-}
-
-// generateDefaultRedSprite creates the default red spaceship sprite (hardcoded fallback)
-func generateDefaultRedSprite() *ebiten.Image {
-	design := []string{
-		"......GW......",
-		"....GGGGGG....",
-		"...G..GG..G...",
-		"..PPPPPPPPPP..",
-		".B.P.P.P.P.B.",
-		"BBPTPTPTPTPPBB",
-		"YYPYPYPYPYPYYY",
-		".R...R..R...R.",
-		"......RR......",
-	}
-
-	palette := map[rune]color.RGBA{
-		'G': {R: 50, G: 255, B: 50, A: 255},
-		'W': {R: 200, G: 255, B: 200, A: 255},
-		'P': {R: 150, G: 50, B: 200, A: 255},
-		'T': {R: 120, G: 40, B: 180, A: 255},
-		'B': {R: 50, G: 150, B: 255, A: 255},
-		'Y': {R: 255, G: 255, B: 0, A: 255},
-		'R': {R: 255, G: 100, B: 50, A: 255},
-	}
-
-	return generateSprite(design, palette)
-}
-
-// generateDefaultBlueSprite creates the default blue spaceship sprite (hardcoded fallback)
-func generateDefaultBlueSprite() *ebiten.Image {
-	design := []string{
-		".......C.......",
-		"......CWC......",
-		"......CBC......",
-		".....BBBBB.....",
-		"....B.B.B.B....",
-		"...D..B.B..D...",
-		"..D...Y.Y...D..",
-		".D....F.F....D.",
-	}
-
-	palette := map[rune]color.RGBA{
-		'C': {R: 0, G: 255, B: 255, A: 255},
-		'W': {R: 255, G: 255, B: 255, A: 255},
-		'B': {R: 0, G: 100, B: 255, A: 255},
-		'D': {R: 0, G: 0, B: 150, A: 255},
-		'Y': {R: 255, G: 200, B: 0, A: 255},
-		'F': {R: 255, G: 100, B: 0, A: 200},
-	}
-
-	return generateSprite(design, palette)
-}
-
-// generateSprite converts an ASCII grid into an Ebiten image
-func generateSprite(design []string, palette map[rune]color.RGBA) *ebiten.Image {
-	h := len(design)
-	w := len(design[0])
-	img := ebiten.NewImage(w, h)
-
-	for y, row := range design {
-		for x, char := range row {
-			if col, ok := palette[char]; ok {
-				img.Set(x, y, col)
-			}
-		}
-	}
-	return img
-}
 
 // restartSimulation stops the current world and spawns a new one with current config
 func (g *Game) restartSimulation() {

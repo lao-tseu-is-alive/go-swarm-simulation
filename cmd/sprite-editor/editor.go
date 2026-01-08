@@ -545,10 +545,10 @@ func main() {
 
 	// If no args, use defaults
 	if *spritePath == "" {
-		*spritePath = "assets/sprites/blue_spaceship.sprite"
+		*spritePath = "assets/sprites/red_spaceship.sprite"
 	}
 	if *palettePath == "" {
-		*palettePath = "assets/sprites/blue_spaceship.palette"
+		*palettePath = "assets/sprites/red_spaceship.palette"
 	}
 
 	editor, err := NewEditor(*spritePath, *palettePath)
