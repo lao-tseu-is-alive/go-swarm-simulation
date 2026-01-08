@@ -19,6 +19,7 @@
   "logLevel": "info",
   "displayDetectionCircle": false,
   "displayDefenseCircle": false,
+  "displaySpatialGrid": false,
   "redSpritePath": "assets/sprites/red_spaceship.sprite",
   "redPalettePath": "assets/sprites/red_spaceship.palette",
   "blueSpritePath": "assets/sprites/blue_spaceship.sprite",

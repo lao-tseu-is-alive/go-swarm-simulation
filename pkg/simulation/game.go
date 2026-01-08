@@ -44,22 +44,23 @@ type Game struct {
 	panel *ui.UIPanel
 
 	// Widget references for easy access
-	widgetDetectionRadius  *ui.Slider
-	widgetDefenseRadius    *ui.Slider
-	widgetContactRadius    *ui.Slider
-	widgetVisualRange      *ui.Slider
-	widgetProtectedRange   *ui.Slider
-	widgetMaxSpeed         *ui.Slider
-	widgetMinSpeed         *ui.Slider
-	widgetAggression       *ui.Slider
-	widgetCenteringFactor  *ui.Slider
-	widgetAvoidFactor      *ui.Slider
-	widgetMatchingFactor   *ui.Slider
-	widgetTurnFactor       *ui.Slider
-	widgetNumRed           *ui.Slider
-	widgetNumBlue          *ui.Slider
-	widgetDisplayDetection *ui.Checkbox
-	widgetDisplayDefense   *ui.Checkbox
+	widgetDetectionRadius    *ui.Slider
+	widgetDefenseRadius      *ui.Slider
+	widgetContactRadius      *ui.Slider
+	widgetVisualRange        *ui.Slider
+	widgetProtectedRange     *ui.Slider
+	widgetMaxSpeed           *ui.Slider
+	widgetMinSpeed           *ui.Slider
+	widgetAggression         *ui.Slider
+	widgetCenteringFactor    *ui.Slider
+	widgetAvoidFactor        *ui.Slider
+	widgetMatchingFactor     *ui.Slider
+	widgetTurnFactor         *ui.Slider
+	widgetNumRed             *ui.Slider
+	widgetNumBlue            *ui.Slider
+	widgetDisplayDetection   *ui.Checkbox
+	widgetDisplayDefense     *ui.Checkbox
+	widgetDisplaySpatialGrid *ui.Checkbox
 
 	cfg *Config
 
@@ -142,6 +143,7 @@ func GetNewGame(ctx context.Context, cfg *Config, system actor.ActorSystem) *Gam
 	panel.AddSection("Visualization")
 	widgetDisplayDetection := panel.AddCheckbox("Show Detection Circle", cfg.DisplayDetectionCircle)
 	widgetDisplayDefense := panel.AddCheckbox("Show Defense Circle", cfg.DisplayDefenseCircle)
+	widgetDisplaySpatialGrid := panel.AddCheckbox("Show Spatial Grid", cfg.DisplaySpatialGrid)
 	panel.EndSection()
 
 	panel.AddSection("Actions")
@@ -153,32 +155,33 @@ func GetNewGame(ctx context.Context, cfg *Config, system actor.ActorSystem) *Gam
 	toggleButton := ui.NewButton(10, 10, 120, 35, "< Settings", nil)
 
 	game := &Game{
-		ctx:                    ctx,
-		System:                 system,
-		worldPID:               worldPID,
-		snapshotCh:             snapshotCh,
-		lastState:              &pb.WorldSnapshot{}, // Avoid nil pointer
-		trails:                 make(map[string][]geometry.Vector2D),
-		panel:                  panel,
-		widgetDetectionRadius:  widgetDetectionRadius,
-		widgetDefenseRadius:    widgetDefenseRadius,
-		widgetContactRadius:    widgetContactRadius,
-		widgetVisualRange:      widgetVisualRange,
-		widgetProtectedRange:   widgetProtectedRange,
-		widgetMaxSpeed:         widgetMaxSpeed,
-		widgetMinSpeed:         widgetMinSpeed,
-		widgetAggression:       widgetAggression,
-		widgetCenteringFactor:  widgetCenteringFactor,
-		widgetAvoidFactor:      widgetAvoidFactor,
-		widgetMatchingFactor:   widgetMatchingFactor,
-		widgetTurnFactor:       widgetTurnFactor,
-		widgetNumRed:           widgetNumRed,
-		widgetNumBlue:          widgetNumBlue,
-		widgetDisplayDetection: widgetDisplayDetection,
-		widgetDisplayDefense:   widgetDisplayDefense,
-		toggleButton:           toggleButton,
-		restartRequested:       false,
-		cfg:                    cfg,
+		ctx:                      ctx,
+		System:                   system,
+		worldPID:                 worldPID,
+		snapshotCh:               snapshotCh,
+		lastState:                &pb.WorldSnapshot{}, // Avoid nil pointer
+		trails:                   make(map[string][]geometry.Vector2D),
+		panel:                    panel,
+		widgetDetectionRadius:    widgetDetectionRadius,
+		widgetDefenseRadius:      widgetDefenseRadius,
+		widgetContactRadius:      widgetContactRadius,
+		widgetVisualRange:        widgetVisualRange,
+		widgetProtectedRange:     widgetProtectedRange,
+		widgetMaxSpeed:           widgetMaxSpeed,
+		widgetMinSpeed:           widgetMinSpeed,
+		widgetAggression:         widgetAggression,
+		widgetCenteringFactor:    widgetCenteringFactor,
+		widgetAvoidFactor:        widgetAvoidFactor,
+		widgetMatchingFactor:     widgetMatchingFactor,
+		widgetTurnFactor:         widgetTurnFactor,
+		widgetNumRed:             widgetNumRed,
+		widgetNumBlue:            widgetNumBlue,
+		widgetDisplayDetection:   widgetDisplayDetection,
+		widgetDisplayDefense:     widgetDisplayDefense,
+		widgetDisplaySpatialGrid: widgetDisplaySpatialGrid,
+		toggleButton:             toggleButton,
+		restartRequested:         false,
+		cfg:                      cfg,
 	}
 
 	// Set up callbacks now that game exists
@@ -244,6 +247,7 @@ func (g *Game) Update() error {
 			NumBlueAtStart:         int32(g.widgetNumBlue.Value),
 			DisplayDetectionCircle: g.widgetDisplayDetection.Value,
 			DisplayDefenseCircle:   g.widgetDisplayDefense.Value,
+			DisplaySpatialGrid:     g.widgetDisplaySpatialGrid.Value,
 		})
 
 		// Trigger Simulation Step
@@ -259,6 +263,11 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		g.lastDrawDuration = time.Since(start)
 		g.drawAvg = g.drawAvg*0.95 + float64(g.lastDrawDuration.Microseconds())/1000.0*0.05
 	}()
+
+	// 0. Draw spatial grid if enabled (behind actors)
+	if g.widgetDisplaySpatialGrid.Value {
+		g.drawSpatialGrid(screen)
+	}
 
 	// 1. Draw all actors from the last known snapshot
 	if g.lastState != nil {
@@ -699,6 +708,7 @@ func (g *Game) restartSimulation() {
 	g.cfg.NumBlueAtStart = int(g.widgetNumBlue.Value)
 	g.cfg.DisplayDetectionCircle = g.widgetDisplayDetection.Value
 	g.cfg.DisplayDefenseCircle = g.widgetDisplayDefense.Value
+	g.cfg.DisplaySpatialGrid = g.widgetDisplaySpatialGrid.Value
 
 	// Reset game over state
 	g.lastState = &pb.WorldSnapshot{
@@ -714,4 +724,31 @@ func (g *Game) restartSimulation() {
 		return
 	}
 	g.worldPID = worldPID
+}
+
+// drawSpatialGrid renders the spatial hashing grid overlay
+// This helps visualize how actors are distributed across cells
+// and how cell size changes with detection/vision radius settings.
+func (g *Game) drawSpatialGrid(screen *ebiten.Image) {
+	cellSize := g.getCellSize()
+	gridColor := color.RGBA{R: 100, G: 100, B: 100, A: 80}
+
+	// Draw vertical lines
+	for x := 0.0; x <= g.cfg.WorldWidth; x += cellSize {
+		vector.StrokeLine(screen, float32(x), 0, float32(x), float32(g.cfg.WorldHeight), 1, gridColor, false)
+	}
+
+	// Draw horizontal lines
+	for y := 0.0; y <= g.cfg.WorldHeight; y += cellSize {
+		vector.StrokeLine(screen, 0, float32(y), float32(g.cfg.WorldWidth), float32(y), 1, gridColor, false)
+	}
+}
+
+// getCellSize returns the current spatial grid cell size.
+// This mirrors the logic in WorldActor.getCellSize() to ensure
+// the visualization matches the actual grid used for neighbor lookup.
+func (g *Game) getCellSize() float64 {
+	maxRadius := math.Max(g.widgetDetectionRadius.Value, g.widgetDefenseRadius.Value)
+	maxRadius = math.Max(maxRadius, g.widgetVisualRange.Value)
+	return math.Max(maxRadius, 10.0)
 }

@@ -110,6 +110,10 @@
       "type": "boolean",
       "description": "Toggle drawing of defense radius for Blue actors."
     },
+    "displaySpatialGrid": {
+      "type": "boolean",
+      "description": "Toggle drawing of spatial hashing grid overlay."
+    },
     "redSpritePath": {
       "type": "string",
       "description": "Path to the red spaceship sprite design file."
@@ -147,6 +151,7 @@
     "logLevel",
     "logFormat",
     "displayDetectionCircle",
-    "displayDefenseCircle"
+    "displayDefenseCircle",
+    "displaySpatialGrid"
   ]
 }

@@ -123,6 +123,7 @@ func (w *WorldActor) Receive(ctx *actor.ReceiveContext) {
 		w.cfg.BlueEdgeAvoidance = msg.GetTurnFactor()
 		w.cfg.DisplayDetectionCircle = msg.GetDisplayDetectionCircle()
 		w.cfg.DisplayDefenseCircle = msg.GetDisplayDefenseCircle()
+		w.cfg.DisplaySpatialGrid = msg.GetDisplaySpatialGrid()
 
 		// Population params (require restart)
 		w.cfg.NumRedAtStart = int(msg.GetNumRedAtStart())

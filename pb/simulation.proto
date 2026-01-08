@@ -81,4 +81,5 @@ message UpdateConfig {
 	// Visualization
 	bool display_detection_circle = 15;
 	bool display_defense_circle = 16;
+	bool display_spatial_grid = 17;
 }

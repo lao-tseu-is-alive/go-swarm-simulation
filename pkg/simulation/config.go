@@ -115,6 +115,9 @@ type Config struct {
 	// DisplayDefenseCircle toggles drawing the defense radius around Blue actors.
 	// UI Label: "Show Defense Circle"
 	DisplayDefenseCircle bool `json:"displayDefenseCircle"`
+	// DisplaySpatialGrid toggles drawing the spatial hashing grid overlay.
+	// UI Label: "Show Spatial Grid"
+	DisplaySpatialGrid bool `json:"displaySpatialGrid"`
 
 	// =========================================================================
 	// SPRITES (not exposed in UI)
@@ -154,6 +157,7 @@ func DefaultConfig() *Config {
 		LogFormat:              "json",
 		DisplayDetectionCircle: false,
 		DisplayDefenseCircle:   false,
+		DisplaySpatialGrid:     false,
 		RedSpritePath:          "assets/sprites/red_spaceship.sprite",
 		RedPalettePath:         "assets/sprites/red_spaceship.palette",
 		BlueSpritePath:         "assets/sprites/blue_spaceship.sprite",

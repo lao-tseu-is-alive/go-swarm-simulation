@@ -1,6 +1,7 @@
 package simulation
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/lao-tseu-is-alive/go-swarm-simulation/pkg/geometry"
@@ -171,5 +172,131 @@ func BenchmarkWorldActor_getNearbyActors(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		// Query middle of the map
 		w.getNearbyActors(500, 500)
+	}
+}
+
+// =============================================================================
+// ENHANCED BENCHMARKS: Scenario-based grid performance measurement
+// =============================================================================
+
+// setupBenchWorld creates a WorldActor with uniformly distributed entities
+// for benchmarking purposes. Entities are spread across the grid to simulate
+// typical simulation conditions.
+func setupBenchWorld(count int, cellSize float64) *WorldActor {
+	cfg := &Config{
+		WorldWidth:        1000,
+		WorldHeight:       1000,
+		RedDetectionRange: cellSize, // cellSize determines grid granularity
+		BlueDefenseRange:  50,
+		BlueFlockVision:   70,
+	}
+	w := NewWorldActor(nil, cfg)
+
+	// Distribute entities uniformly across the world
+	for i := 0; i < count; i++ {
+		id := fmt.Sprintf("actor-%d", i)
+		// Use modulo to spread across world dimensions
+		x := float64(i%100) * 10.0
+		y := float64(i/100) * 10.0
+		w.entities[id] = &Entity{
+			ID:  id,
+			Pos: geometry.Vector2D{X: x, Y: y},
+		}
+	}
+	w.rebuildGrid()
+	return w
+}
+
+// simulateMovement moves a percentage of actors to new cells.
+// This simulates typical simulation behavior where some actors cross cell boundaries.
+// movementRatio: 0.0 = no movement, 1.0 = all actors move to new cells
+func simulateMovement(w *WorldActor, movementRatio float64, cellSize float64) {
+	count := 0
+	moveCount := int(float64(len(w.entities)) * movementRatio)
+
+	for _, entity := range w.entities {
+		if count >= moveCount {
+			break
+		}
+		// Move actor by more than one cell size to guarantee cell change
+		entity.Pos.X += cellSize + 1
+		if entity.Pos.X > 1000 {
+			entity.Pos.X = 0 // Wrap around
+		}
+		count++
+	}
+}
+
+// BenchmarkRebuildGrid_10PercentMoved simulates typical flocking behavior
+// where most actors stay in the same cell (low movement across boundaries).
+func BenchmarkRebuildGrid_10PercentMoved(b *testing.B) {
+	cellSize := 100.0
+	w := setupBenchWorld(1000, cellSize)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		simulateMovement(w, 0.10, cellSize)
+		w.rebuildGrid()
+	}
+}
+
+// BenchmarkRebuildGrid_50PercentMoved simulates moderate activity
+// where half the actors cross cell boundaries.
+func BenchmarkRebuildGrid_50PercentMoved(b *testing.B) {
+	cellSize := 100.0
+	w := setupBenchWorld(1000, cellSize)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		simulateMovement(w, 0.50, cellSize)
+		w.rebuildGrid()
+	}
+}
+
+// BenchmarkRebuildGrid_90PercentMoved simulates worst-case scenario
+// where nearly all actors change cells (e.g., high-speed chase scenario).
+func BenchmarkRebuildGrid_90PercentMoved(b *testing.B) {
+	cellSize := 100.0
+	w := setupBenchWorld(1000, cellSize)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		simulateMovement(w, 0.90, cellSize)
+		w.rebuildGrid()
+	}
+}
+
+// BenchmarkRebuildGrid_SmallCells tests performance with smaller cells
+// (more cells to process, but fewer actors per cell).
+func BenchmarkRebuildGrid_SmallCells(b *testing.B) {
+	cellSize := 25.0 // 4x more cells than default
+	w := setupBenchWorld(1000, cellSize)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		w.rebuildGrid()
+	}
+}
+
+// BenchmarkRebuildGrid_LargeCells tests performance with larger cells
+// (fewer cells but more actors per cell).
+func BenchmarkRebuildGrid_LargeCells(b *testing.B) {
+	cellSize := 200.0 // Half as many cells as default
+	w := setupBenchWorld(1000, cellSize)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		w.rebuildGrid()
+	}
+}
+
+// BenchmarkRebuildGrid_HighDensity tests performance with high actor count.
+func BenchmarkRebuildGrid_HighDensity(b *testing.B) {
+	cellSize := 100.0
+	w := setupBenchWorld(5000, cellSize) // 5x more actors
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		w.rebuildGrid()
 	}
 }
