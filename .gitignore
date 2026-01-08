@@ -38,3 +38,6 @@ go.work.sum
 /reports/Grok _ X_Report_20251205.pdf
 /simulation
 /.github/workflows/trivy-scan.yml
+
+./sprite-editor
+./simulation
