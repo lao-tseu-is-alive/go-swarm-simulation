@@ -1,0 +1,105 @@
+diff --git a/pkg/simulation/world.go b/pkg/simulation/world.go
+index 5f74aac..0d4e6c6 100644
+--- a/pkg/simulation/world.go
++++ b/pkg/simulation/world.go
+@@ -28,6 +28,10 @@ type WorldActor struct {
+ 	// Optimization: Spatial Hashing
+ 	// Map gridKey -> list of entities in that cell
+ 	grid map[gridKey][]*Entity
++	// Incremental Grid Optimization: track which cell each actor is currently in
++	actorCells map[string]gridKey
++	// Cache cell size to detect when radii change (requires full rebuild)
++	lastCellSize float64
+ 	// Communication with UI
+ 	snapshotCh chan<- *pb.WorldSnapshot
+ 	// Game Settings (received from UI)
+@@ -47,6 +51,8 @@ func NewWorldActor(snapshotCh chan<- *pb.WorldSnapshot, cfg *Config) *WorldActor
+ 		entities:        make(map[string]*Entity),
+ 		pidsCache:       make(map[string]*actor.PID),
+ 		grid:            make(map[gridKey][]*Entity),
++		actorCells:      make(map[string]gridKey),
++		lastCellSize:    0.0,
+ 		snapshotCh:      snapshotCh,
+ 		cfg:             cfg,
+ 		detectionRadius: cfg.RedDetectionRange,
+@@ -344,20 +350,74 @@ func (w *WorldActor) spawnSwarm(ctx *actor.ReceiveContext) {
+ }
+ 
+ func (w *WorldActor) rebuildGrid() {
+-	// 1. Reset slices to length 0, but keep capacity! it's better then clear(w.grid)
+-	// This allows to reuse the underlying arrays of the slices,
+-	// reducing memory allocation to almost zero during runtime.
++	cellSize := w.getCellSize()
++
++	// If cell size changed (radii changed via UI), do full rebuild
++	if cellSize != w.lastCellSize {
++		w.fullRebuildGrid(cellSize)
++		w.lastCellSize = cellSize
++		return
++	}
++
++	// Incremental update: only update actors that moved to new cells
++	for _, actor := range w.entities {
++		w.updateActorInGrid(actor, cellSize)
++	}
++}
++
++// fullRebuildGrid performs a complete grid rebuild.
++// Called on first tick and when cell size changes (radii changed).
++func (w *WorldActor) fullRebuildGrid(cellSize float64) {
++	// Clear grid slices but keep capacity
+ 	for k := range w.grid {
+ 		w.grid[k] = w.grid[k][:0]
+ 	}
++	// Clear cell tracking
++	for k := range w.actorCells {
++		delete(w.actorCells, k)
++	}
+ 
+-	cellSize := w.getCellSize()
++	// Rebuild both grid and tracking
+ 	for _, a := range w.entities {
+ 		gx, gy := int(a.Pos.X/cellSize), int(a.Pos.Y/cellSize)
+ 		key := gridKey{x: gx, y: gy}
+-
+-		// append will reuse the existing array capacity if available
+ 		w.grid[key] = append(w.grid[key], a)
++		w.actorCells[a.ID] = key
++	}
++}
++
++// updateActorInGrid moves an actor to its new cell if it changed.
++// Uses swap-and-truncate for O(1) removal (order doesn't matter in cells).
++func (w *WorldActor) updateActorInGrid(actor *Entity, cellSize float64) {
++	gx, gy := int(actor.Pos.X/cellSize), int(actor.Pos.Y/cellSize)
++	newCell := gridKey{x: gx, y: gy}
++	oldCell, exists := w.actorCells[actor.ID]
++
++	if exists && oldCell == newCell {
++		return // Actor stayed in same cell - most common case
++	}
++
++	// Remove from old cell if it exists
++	if exists {
++		w.removeFromCell(oldCell, actor.ID)
++	}
++
++	// Add to new cell
++	w.grid[newCell] = append(w.grid[newCell], actor)
++	w.actorCells[actor.ID] = newCell
++}
++
++// removeFromCell removes an actor from a specific grid cell.
++// Uses swap-with-last for O(1) unordered removal.
++func (w *WorldActor) removeFromCell(cell gridKey, actorID string) {
++	actors := w.grid[cell]
++	for i, a := range actors {
++		if a.ID == actorID {
++			// Swap with last and truncate
++			actors[i] = actors[len(actors)-1]
++			w.grid[cell] = actors[:len(actors)-1]
++			return
++		}
+ 	}
+ }
+ 

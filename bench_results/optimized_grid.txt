@@ -1,0 +1,36 @@
+goos: linux
+goarch: amd64
+pkg: github.com/lao-tseu-is-alive/go-swarm-simulation/pkg/simulation
+cpu: Intel(R) Core(TM) i9-10980XE CPU @ 3.00GHz
+BenchmarkRebuildGrid_10PercentMoved-36    	   22844	     52293 ns/op	       0 B/op	       0 allocs/op
+BenchmarkRebuildGrid_10PercentMoved-36    	   21909	     52697 ns/op	       0 B/op	       0 allocs/op
+BenchmarkRebuildGrid_10PercentMoved-36    	   21847	     57102 ns/op	       0 B/op	       0 allocs/op
+BenchmarkRebuildGrid_10PercentMoved-36    	   22587	     52515 ns/op	       0 B/op	       0 allocs/op
+BenchmarkRebuildGrid_10PercentMoved-36    	   22320	     52364 ns/op	       0 B/op	       0 allocs/op
+BenchmarkRebuildGrid_50PercentMoved-36    	    7119	    151205 ns/op	       0 B/op	       0 allocs/op
+BenchmarkRebuildGrid_50PercentMoved-36    	    7800	    161420 ns/op	       0 B/op	       0 allocs/op
+BenchmarkRebuildGrid_50PercentMoved-36    	    7065	    152712 ns/op	       0 B/op	       0 allocs/op
+BenchmarkRebuildGrid_50PercentMoved-36    	    7521	    167832 ns/op	       0 B/op	       0 allocs/op
+BenchmarkRebuildGrid_50PercentMoved-36    	    6956	    187983 ns/op	       0 B/op	       0 allocs/op
+BenchmarkRebuildGrid_90PercentMoved-36    	    4792	    256900 ns/op	       0 B/op	       0 allocs/op
+BenchmarkRebuildGrid_90PercentMoved-36    	    4288	    291149 ns/op	       0 B/op	       0 allocs/op
+BenchmarkRebuildGrid_90PercentMoved-36    	    4719	    257203 ns/op	       0 B/op	       0 allocs/op
+BenchmarkRebuildGrid_90PercentMoved-36    	    4600	    247451 ns/op	       0 B/op	       0 allocs/op
+BenchmarkRebuildGrid_90PercentMoved-36    	    4844	    249798 ns/op	       2 B/op	       0 allocs/op
+BenchmarkRebuildGrid_SmallCells-36        	   42626	     31983 ns/op	       0 B/op	       0 allocs/op
+BenchmarkRebuildGrid_SmallCells-36        	   41826	     27995 ns/op	       0 B/op	       0 allocs/op
+BenchmarkRebuildGrid_SmallCells-36        	   37743	     33151 ns/op	       0 B/op	       0 allocs/op
+BenchmarkRebuildGrid_SmallCells-36        	   35410	     33565 ns/op	       0 B/op	       0 allocs/op
+BenchmarkRebuildGrid_SmallCells-36        	   37221	     30917 ns/op	       0 B/op	       0 allocs/op
+BenchmarkRebuildGrid_LargeCells-36        	   43327	     31229 ns/op	       0 B/op	       0 allocs/op
+BenchmarkRebuildGrid_LargeCells-36        	   40918	     28498 ns/op	       0 B/op	       0 allocs/op
+BenchmarkRebuildGrid_LargeCells-36        	   42986	     29379 ns/op	       0 B/op	       0 allocs/op
+BenchmarkRebuildGrid_LargeCells-36        	   40821	     30127 ns/op	       0 B/op	       0 allocs/op
+BenchmarkRebuildGrid_LargeCells-36        	   43926	     27720 ns/op	       0 B/op	       0 allocs/op
+BenchmarkRebuildGrid_HighDensity-36       	    7531	    173367 ns/op	       0 B/op	       0 allocs/op
+BenchmarkRebuildGrid_HighDensity-36       	    7216	    156521 ns/op	       0 B/op	       0 allocs/op
+BenchmarkRebuildGrid_HighDensity-36       	    6897	    170135 ns/op	       0 B/op	       0 allocs/op
+BenchmarkRebuildGrid_HighDensity-36       	    7471	    165943 ns/op	       0 B/op	       0 allocs/op
+BenchmarkRebuildGrid_HighDensity-36       	    7425	    168774 ns/op	       0 B/op	       0 allocs/op
+PASS
+ok  	github.com/lao-tseu-is-alive/go-swarm-simulation/pkg/simulation	53.820s

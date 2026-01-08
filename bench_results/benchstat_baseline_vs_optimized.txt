@@ -1,0 +1,40 @@
+goos: linux
+goarch: amd64
+pkg: github.com/lao-tseu-is-alive/go-swarm-simulation/pkg/simulation
+cpu: Intel(R) Core(TM) i9-10980XE CPU @ 3.00GHz
+                              │ baseline_grid.txt │          optimized_grid.txt           │
+                              │      sec/op       │    sec/op      vs base                │
+RebuildGrid_10PercentMoved-36        32.40µ ± ∞ ¹    52.52µ ± ∞ ¹   +62.08% (p=0.008 n=5)
+RebuildGrid_50PercentMoved-36        35.58µ ± ∞ ¹   161.42µ ± ∞ ¹  +353.69% (p=0.008 n=5)
+RebuildGrid_90PercentMoved-36        41.85µ ± ∞ ¹   256.90µ ± ∞ ¹  +513.90% (p=0.008 n=5)
+RebuildGrid_SmallCells-36            30.91µ ± ∞ ¹    31.98µ ± ∞ ¹         ~ (p=0.548 n=5)
+RebuildGrid_LargeCells-36            27.13µ ± ∞ ¹    29.38µ ± ∞ ¹         ~ (p=0.222 n=5)
+RebuildGrid_HighDensity-36           149.0µ ± ∞ ¹    168.8µ ± ∞ ¹   +13.24% (p=0.008 n=5)
+geomean                              42.66µ          83.76µ         +96.34%
+¹ need >= 6 samples for confidence interval at level 0.95
+
+                              │ baseline_grid.txt │         optimized_grid.txt          │
+                              │       B/op        │    B/op      vs base                │
+RebuildGrid_10PercentMoved-36         0.000 ± ∞ ¹   0.000 ± ∞ ¹       ~ (p=1.000 n=5) ²
+RebuildGrid_50PercentMoved-36         0.000 ± ∞ ¹   0.000 ± ∞ ¹       ~ (p=1.000 n=5) ²
+RebuildGrid_90PercentMoved-36         0.000 ± ∞ ¹   0.000 ± ∞ ¹       ~ (p=1.000 n=5)
+RebuildGrid_SmallCells-36             0.000 ± ∞ ¹   0.000 ± ∞ ¹       ~ (p=1.000 n=5) ²
+RebuildGrid_LargeCells-36             0.000 ± ∞ ¹   0.000 ± ∞ ¹       ~ (p=1.000 n=5) ²
+RebuildGrid_HighDensity-36            0.000 ± ∞ ¹   0.000 ± ∞ ¹       ~ (p=1.000 n=5) ²
+geomean                                         ³                +0.00%               ³
+¹ need >= 6 samples for confidence interval at level 0.95
+² all samples are equal
+³ summaries must be >0 to compute geomean
+
+                              │ baseline_grid.txt │         optimized_grid.txt          │
+                              │     allocs/op     │  allocs/op   vs base                │
+RebuildGrid_10PercentMoved-36         0.000 ± ∞ ¹   0.000 ± ∞ ¹       ~ (p=1.000 n=5) ²
+RebuildGrid_50PercentMoved-36         0.000 ± ∞ ¹   0.000 ± ∞ ¹       ~ (p=1.000 n=5) ²
+RebuildGrid_90PercentMoved-36         0.000 ± ∞ ¹   0.000 ± ∞ ¹       ~ (p=1.000 n=5) ²
+RebuildGrid_SmallCells-36             0.000 ± ∞ ¹   0.000 ± ∞ ¹       ~ (p=1.000 n=5) ²
+RebuildGrid_LargeCells-36             0.000 ± ∞ ¹   0.000 ± ∞ ¹       ~ (p=1.000 n=5) ²
+RebuildGrid_HighDensity-36            0.000 ± ∞ ¹   0.000 ± ∞ ¹       ~ (p=1.000 n=5) ²
+geomean                                         ³                +0.00%               ³
+¹ need >= 6 samples for confidence interval at level 0.95
+² all samples are equal
+³ summaries must be >0 to compute geomean
