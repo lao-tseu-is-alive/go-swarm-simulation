@@ -26,10 +26,14 @@ import (
 )
 
 const (
-	screenWidth  = 900
-	screenHeight = 700
-	pixelSize    = 24 // Magnified pixel size
-	previewScale = 4  // 1:1 preview scale for visibility
+	screenWidth          = 900
+	screenHeight         = 700
+	pixelSize            = 24 // Magnified pixel size
+	previewScale         = 1  // 1:1 preview scale for visibility
+	defaultSpritePath    = "assets/sprites/blue_spaceship.sprite"
+	defaultSpritePalette = "assets/sprites/blue_spaceship.palette"
+	//defaultSpritePath = "assets/sprites/red_spaceship.sprite"
+	//defaultSpritePalette = "assets/sprites/red_spaceship.palette"
 )
 
 // Editor is the main sprite editor application
@@ -545,10 +549,10 @@ func main() {
 
 	// If no args, use defaults
 	if *spritePath == "" {
-		*spritePath = "assets/sprites/red_spaceship.sprite"
+		*spritePath = defaultSpritePath
 	}
 	if *palettePath == "" {
-		*palettePath = "assets/sprites/red_spaceship.palette"
+		*palettePath = defaultSpritePalette
 	}
 
 	editor, err := NewEditor(*spritePath, *palettePath)

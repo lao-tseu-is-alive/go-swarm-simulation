@@ -1,6 +1,9 @@
 package simulation
 
 import (
+	"math"
+	"math/rand/v2"
+
 	"github.com/lao-tseu-is-alive/go-swarm-simulation/pb"
 	"github.com/lao-tseu-is-alive/go-swarm-simulation/pkg/geometry"
 )
@@ -54,6 +57,14 @@ func ComputeBoidUpdate(
 		// 1. Separation - push away if too close
 		if distSq < personalSpaceSq {
 			diff := me.Pos.Sub(other.Pos)
+			if distSq < 0.01 {
+				// If entities are at exact same position, Normalize returns (0,0).
+				// Give a random push direction to unstick them.
+				angle := rand.Float64() * 2 * math.Pi
+				diff = geometry.Vector2D{X: math.Cos(angle), Y: math.Sin(angle)}
+			}
+
+			diff = diff.Normalize()
 			separationForce = separationForce.Add(diff)
 		}
 
