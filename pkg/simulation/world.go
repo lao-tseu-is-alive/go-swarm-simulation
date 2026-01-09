@@ -39,6 +39,8 @@ type WorldActor struct {
 	msgSentCount int
 	msgRecvCount int
 	lastLogTime  time.Time
+	numReds      int
+	numBlues     int
 }
 
 // NewWorldActor creates the world logic unit
@@ -55,6 +57,8 @@ func NewWorldActor(snapshotCh chan<- *pb.WorldSnapshot, cfg *Config) *WorldActor
 		msgSentCount:    0,
 		msgRecvCount:    0,
 		lastLogTime:     time.Now(),
+		numReds:         cfg.NumRedAtStart,
+		numBlues:        cfg.NumBlueAtStart,
 	}
 }
 
@@ -99,7 +103,7 @@ func (w *WorldActor) Receive(ctx *actor.ReceiveContext) {
 		w.broadcastSimulationStep(ctx, msg.DeltaTime)
 
 		// 3. UI Update
-		w.pushSnapshot()
+		w.pushSnapshot(ctx)
 
 		// Handle dynamic config updates from UI
 	case *pb.UpdateConfig:
@@ -141,9 +145,18 @@ func (w *WorldActor) Receive(ctx *actor.ReceiveContext) {
 // logBenchmarks logs message throughput statistics once per second.
 func (w *WorldActor) logBenchmarks(ctx *actor.ReceiveContext) {
 	if time.Since(w.lastLogTime) >= time.Second {
+		// Count actual entity colors (ground truth) instead of incremental counters
+		redCount, blueCount := 0, 0
+		for _, e := range w.entities {
+			if e.Color == pb.TeamColor_TEAM_RED {
+				redCount++
+			} else {
+				blueCount++
+			}
+		}
 		total := w.msgSentCount + w.msgRecvCount
-		ctx.Logger().Infof("📊 MSG RATE: %d/sec (Sent: %d, Recv: %d) | Actors: %d",
-			total, w.msgSentCount, w.msgRecvCount, len(w.entities))
+		ctx.Logger().Infof("📊 MSG RATE: %d/sec (Sent: %d, Recv: %d) | Actors: %d (R:%d, B:%d)",
+			total, w.msgSentCount, w.msgRecvCount, len(w.entities), redCount, blueCount)
 		w.msgSentCount = 0
 		w.msgRecvCount = 0
 		w.lastLogTime = time.Now()
@@ -152,11 +165,12 @@ func (w *WorldActor) logBenchmarks(ctx *actor.ReceiveContext) {
 
 // pushSnapshot sends the current world state to the UI channel.
 // Non-blocking: if the channel is full, this frame is skipped.
-func (w *WorldActor) pushSnapshot() {
+func (w *WorldActor) pushSnapshot(ctx *actor.ReceiveContext) {
 	select {
 	case w.snapshotCh <- w.buildSnapshot():
 	default:
 		// UI busy, skip frame
+		ctx.Logger().Warnf("📊 pushSnapshot UI busy skipping frame | Actors: %d (R:%d, B:%d)", len(w.entities), w.numReds, w.numBlues)
 	}
 }
 
@@ -274,9 +288,13 @@ func (w *WorldActor) resolveCombat(ctx *actor.ReceiveContext, attacker, victim *
 
 	if defenders >= 3 {
 		// Defense Success: Attacker converts to Blue
+		w.numBlues += 1
+		w.numReds -= 1
 		w.sendConvert(ctx, attacker.ID, pb.TeamColor_TEAM_BLUE)
 	} else {
 		// Defense Failed: Victim converts to Red
+		w.numReds += 1
+		w.numBlues -= 1
 		w.sendConvert(ctx, victim.ID, pb.TeamColor_TEAM_RED)
 	}
 }
